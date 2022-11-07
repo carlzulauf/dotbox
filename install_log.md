@@ -142,3 +142,27 @@ For now it will just install fish configs.
 chmod +x bin/install
 bin/install
 ```
+
+Adding tmux to host
+
+```
+sudo apt install tmux
+```
+
+Clean up apt so it stops complaining
+
+```
+sudo apt auto-remote
+```
+
+What happens if the prompt is installed in a distrobox?
+
+Answer: terrible things. Starship's init script tries to use absolute path to starship.
+
+Basic shell setup might be needed in both the host and distro boxes.
+
+What happens if we add `fish` to `arch`? Seems to pick up configs quite nicely.
+
+```
+arch:$ sudo pacman -S fish starship
+```
