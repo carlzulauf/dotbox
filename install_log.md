@@ -164,5 +164,17 @@ Basic shell setup might be needed in both the host and distro boxes.
 What happens if we add `fish` to `arch`? Seems to pick up configs quite nicely.
 
 ```
-arch:$ sudo pacman -S fish starship
+arch:$ sudo pacman -S fish starship exa
+# had to use sudo because otherwise got password prompt I can't solve
+arch:$ sudo chsh -s /usr/sbin/fish carl
 ```
+
+Let's give the host `exa` and `starship` as well.
+
+```
+# hoped this was user, but prompts for password
+snap install starship
+sudo apt install exa
+```
+
+Going to need some nerd fonts for `exa` icons to show up right.
