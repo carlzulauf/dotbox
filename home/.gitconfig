@@ -1,0 +1,36 @@
+[init]
+  # change the default default branch for new repos from that other one to `main`
+  defaultBranch = main
+
+[alias]
+  # obvious shortcuts
+  st = status
+  d = diff
+  co = checkout
+  b = branch
+
+  # less obvious ones below
+
+  # show the code diff when making the commit message, ie: (c)ommit & (i)nspect
+  ci = commit -v
+  # like the last one, but add every changed file first
+  cia = commit -v -a
+
+  # number of `l`s determines relative details of `git log` output
+  l = log --graph --oneline --branches
+  ll = log --stat
+  lll = log -p
+
+  # useful if you are using a rebasing workflow:
+
+  # don't try to merge when pulling, fast fowards only
+  p = pull --ff-only
+  # pull and attempt to rebase all at once
+  prb = pull --rebase
+  m = merge --ff-only
+
+  # rebase in interactive mode
+  r = rebase -i
+
+[color]
+  ui = auto
