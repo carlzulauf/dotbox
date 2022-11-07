@@ -1,0 +1,210 @@
+#!/usr/bin/env ruby
+
+require "fileutils"
+require "pathname"
+require "optparse"
+require "json"
+
+DOTFILES_BASE_DIR = File.expand_path(
+  File.join(File.dirname(__FILE__), "..", "home")
+)
+INSTALL_DIR = File.expand_path("~")
+BACKUP_DIR = File.expand_path("~/.backup-dotfiles")
+
+Change = Struct.new(:desc, :src, :dest, :action)
+
+class InstallDotfiles < Struct.new(:options)
+  def self.parse(argv)
+    options = default_options
+    OptionParser.new do |parser|
+      parser.banner = "Usage: bin/install [options]"
+
+      parser.on(
+          "-d [DIRECTORY]",
+          "--install-dir [DIRECTORY]",
+          "Directory to use (if you don't want `#{options[:install_dir]}`).") do |dir|
+        options[:install_dir] = File.expand_path(dir)
+      end
+
+      parser.on(
+          "-b [DIRECTORY]",
+          "--backup-dir [DIRECTORY]",
+          "Directory to backup existing dotfiles to. Default: `#{options[:backup_dir]}`.") do |dir|
+        options[:backup_dir] = File.expand_path(dir)
+      end
+
+      parser.on(
+          "-p [DIRECTORY]",
+          "--private-dir [DIRECTORY]",
+          "Add private directory for installer to layer into `#{options[:install_dir]}`.") do |dir|
+        options[:private_dirs] << dir
+      end
+
+      parser.on(
+          "-s [DIRECTORY]",
+          "--dots-dir [DIRECTORY]",
+          "Directory with the base layer of dotfiles. Usually where most of them are. Default: `#{options[:dots_dir]}`.") do |dir|
+        options[:dots_dir] = File.expand_path(dir)
+      end
+    end.parse(argv)
+    new(options)
+  end
+
+  def self.default_options
+    {
+      dots_dir: DOTFILES_BASE_DIR,
+      install_dir: INSTALL_DIR,
+      backup_dir: BACKUP_DIR,
+      private_dirs: [],
+    }
+  end
+
+  def call
+    changes = find_all_changes
+    display_config(changes)
+    confirm_install if changes.any?(&:action)
+    apply_changes(changes)
+  end
+
+  private
+
+  def install_path
+    Pathname.new(options[:install_dir])
+  end
+
+  def backup_path
+    Pathname.new(options[:backup_dir])
+  end
+
+  def dots_path
+    Pathname.new(options[:dots_dir])
+  end
+
+  def private_paths
+    return default_private_paths if options[:private_dirs].empty?
+    options[:private_dirs].map { |dir| Pathname.new(dir) }
+  end
+
+  def default_private_paths
+    [
+      dots_path.join("../../dotbox-private"),
+      dots_path.join("../private"),
+    ].select(&:exist?)
+  end
+
+  def search_paths
+    [dots_path, *private_paths]
+  end
+
+  def find_all_changes
+    search_paths.flat_map do |src|
+      find_changes(src, install_path) if src.directory?
+    end
+  end
+
+  # recursive. modified depth first search.
+  # completes current dir before descending.
+  def find_changes(src, dest)
+    directories = []
+    files = []
+    src.children.each do |child|
+      if child.directory?
+        directories << child
+      elsif child.file?
+        files << check_file(child, dest.join(child.basename))
+      else
+        raise "wat (not file or directory, but child): #{child.inspect}"
+      end
+    end
+    files + directories.flat_map do |dir|
+      find_changes(dir, dest.join(dir.basename))
+    end
+  end
+
+  def apply_changes(changes)
+    changes.each { |c| c.action.() if c.action }
+  end
+
+  def check_file(src, dest)
+    create_symlink = -> do
+      puts "Creating sym link to `#{src}` at `#{dest}`"
+      mkpath(dest.parent)
+      FileUtils.ln_s(src, dest)
+    end
+    if dest.exist?
+      if dest.symlink?
+        if dest.realpath == src
+          change(".", src, dest) # do nothing
+        else
+          change("u", src, dest) do
+            puts "Updating sym link at `#{dest}` from target of `#{dest.realpath}` to `#{src}`"
+            FileUtils.ln_s(src, dest, force: true)
+          end
+        end
+      else
+        change("o", src, dest) do
+          backup_dest = backup_path.join(dest.relative_path_from(install_path))
+          puts "Moving existing file #{dest} to #{backup_dest}"
+          mkpath(backup_dest.parent)
+          FileUtils.mv(dest, backup_dest)
+          create_symlink.()
+        end
+      end
+    else
+      change("c", src, dest, &create_symlink)
+    end
+  end
+
+  def change(desc, src, dest, &action)
+    Change.new(desc, src, dest, action)
+  end
+
+  def mkpath(path)
+    path.mkpath unless path.exist?
+  end
+
+  def confirm_install
+    print "Are you sure you want to apply these changes (Yes/[No])? "
+    answer = gets.strip
+    if answer !~ /^y(es)?$/i
+      puts "Received a non-yes response: #{answer.inspect}"
+      exit
+    end
+  end
+
+  def display_config(changes)
+    puts
+    puts "dotbox dotfiles installer"
+    puts
+    separator
+    puts "| config"
+    separator
+    puts
+    puts " --install-dir #{install_path}"
+    puts " --backup-dir #{backup_path}"
+    puts " --dots-dir #{dots_path}"
+    private_paths.each { |path| puts " --private-dir #{path}"}
+    puts
+    separator
+    puts "| dotfile changes for `#{install_path}`"
+    separator
+    puts
+    puts "c - create symlink"
+    puts "o - overwrite existing file (after backup)"
+    puts "u - update symlink"
+    puts ". - no change"
+    puts
+    changes.each do |change|
+      puts " #{change.desc} #{change.dest}"
+      puts "   ⤷ #{change.src}"
+      puts
+    end
+    separator
+  end
+
+  def separator
+    puts "-" * 80
+  end
+end
+
+InstallDotfiles.parse(ARGV).()
