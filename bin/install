@@ -68,6 +68,10 @@ class InstallDotfiles < Struct.new(:options)
 
   private
 
+  def ignored_files
+
+  end
+
   def install_path
     Pathname.new(options[:install_dir])
   end
@@ -87,7 +91,7 @@ class InstallDotfiles < Struct.new(:options)
 
   def default_private_paths
     [
-      dots_path.join("../../dotbox-private"),
+      dots_path.join("../../dotbox-private/home"),
       dots_path.join("../private"),
     ].select(&:exist?)
   end
@@ -122,33 +126,38 @@ class InstallDotfiles < Struct.new(:options)
   end
 
   def apply_changes(changes)
-    changes.each { |c| c.action.() if c.action }
+    if changes.none?(&:action) # no changes
+      puts "No changes to apply. Exiting."
+      puts
+      exit
+    end
+    puts "Applying changes..."
+    puts
+    changes.each { |c| print " * " && c.action.() if c.action }
   end
 
   def check_file(src, dest)
     create_symlink = -> do
       puts "Creating sym link to `#{src}` at `#{dest}`"
       mkpath(dest.parent)
-      FileUtils.ln_s(src, dest)
+      FileUtils.symlink(src, dest)
     end
-    if dest.exist?
-      if dest.symlink?
-        if dest.realpath == src
-          change(".", src, dest) # do nothing
-        else
-          change("u", src, dest) do
-            puts "Updating sym link at `#{dest}` from target of `#{dest.realpath}` to `#{src}`"
-            FileUtils.ln_s(src, dest, force: true)
-          end
-        end
+    if dest.symlink?
+      if dest.exist? && dest.realpath == src
+        change(".", src, dest) # do nothing
       else
-        change("o", src, dest) do
-          backup_dest = backup_path.join(dest.relative_path_from(install_path))
-          puts "Moving existing file #{dest} to #{backup_dest}"
-          mkpath(backup_dest.parent)
-          FileUtils.mv(dest, backup_dest)
-          create_symlink.()
+        change("u", src, dest) do
+          puts "Updating sym link at `#{dest}` from target of `#{File.readlink(dest)}` to `#{src}`"
+          FileUtils.symlink(src, dest, force: true)
         end
+      end
+    elsif dest.exist?
+      change("o", src, dest) do
+        backup_dest = backup_path.join(dest.relative_path_from(install_path))
+        puts "Moving existing file #{dest} to #{backup_dest}"
+        mkpath(backup_dest.parent)
+        FileUtils.mv(dest, backup_dest)
+        create_symlink.()
       end
     else
       change("c", src, dest, &create_symlink)
@@ -170,6 +179,7 @@ class InstallDotfiles < Struct.new(:options)
       puts "Received a non-yes response: #{answer.inspect}"
       exit
     end
+    separator
   end
 
   def display_config(changes)
