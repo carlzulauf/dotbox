@@ -101,27 +101,41 @@ class InstallDotfiles < Struct.new(:options)
   end
 
   def find_all_changes
-    search_paths.flat_map do |src|
+    changes = search_paths.flat_map do |src|
       find_changes(src, install_path) if src.directory?
     end
+    changes += find_broken_symlinks(changes.map(&:dest))
+    changes
   end
 
   # recursive. modified depth first search.
   # completes current dir before descending.
   def find_changes(src, dest)
     directories = []
-    files = []
+    changes = []
     src.children.each do |child|
       if child.directory?
         directories << child
       elsif child.file?
-        files << check_file(child, dest.join(child.basename))
+        changes << check_file(child, dest.join(child.basename))
       else
         raise "wat (not file or directory, but child): #{child.inspect}"
       end
     end
-    files + directories.flat_map do |dir|
+    changes + directories.flat_map do |dir|
       find_changes(dir, dest.join(dir.basename))
+    end
+  end
+
+  # look for broken symlinks adjacent to the list of files
+  def find_broken_symlinks(files)
+    files.map(&:parent).uniq.flat_map do |dir|
+      dir.children.select{ |f| f.symlink? && !f.exist? }.map do |broken_link|
+        change("⊠", File.readlink(broken_link), broken_link) do
+          puts "Removing broken symlink: `#{broken_link}`"
+          broken_link.unlink
+        end
+      end
     end
   end
 
@@ -133,26 +147,32 @@ class InstallDotfiles < Struct.new(:options)
     end
     puts "Applying changes..."
     puts
-    changes.each { |c| print " * " && c.action.() if c.action }
+    changes.each do |c|
+      if c.action
+        print " * "
+        c.action.()
+      end
+    end
+    puts
   end
 
   def check_file(src, dest)
     create_symlink = -> do
-      puts "Creating sym link to `#{src}` at `#{dest}`"
+      puts "Creating symlink to `#{src}` at `#{dest}`"
       mkpath(dest.parent)
       FileUtils.symlink(src, dest)
     end
     if dest.symlink?
       if dest.exist? && dest.realpath == src
-        change(".", src, dest) # do nothing
+        change("✓", src, dest) # do nothing
       else
-        change("u", src, dest) do
-          puts "Updating sym link at `#{dest}` from target of `#{File.readlink(dest)}` to `#{src}`"
+        change("↺", src, dest) do
+          puts "Updating symlink at `#{dest}` from target of `#{File.readlink(dest)}` to `#{src}`"
           FileUtils.symlink(src, dest, force: true)
         end
       end
     elsif dest.exist?
-      change("o", src, dest) do
+      change("⇄", src, dest) do
         backup_dest = backup_path.join(dest.relative_path_from(install_path))
         puts "Moving existing file #{dest} to #{backup_dest}"
         mkpath(backup_dest.parent)
@@ -160,7 +180,7 @@ class InstallDotfiles < Struct.new(:options)
         create_symlink.()
       end
     else
-      change("c", src, dest, &create_symlink)
+      change("⊕", src, dest, &create_symlink)
     end
   end
 
@@ -199,14 +219,15 @@ class InstallDotfiles < Struct.new(:options)
     puts "| dotfile changes for `#{install_path}`"
     separator
     puts
-    puts "c - create symlink"
-    puts "o - overwrite existing file (after backup)"
-    puts "u - update symlink"
-    puts ". - no change"
+    puts "⊕ - create symlink"
+    puts "⇄ - overwrite existing file (after backup)"
+    puts "↺ - update symlink"
+    puts "⊠ - remove broken symlink"
+    puts "✓ - no change"
     puts
     changes.each do |change|
       puts " #{change.desc} #{change.dest}"
-      puts "   ⤷ #{change.src}"
+      puts "   ⤷ #{change.src}" if change.src
       puts
     end
     separator
