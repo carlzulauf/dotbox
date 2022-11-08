@@ -193,6 +193,8 @@ Installed google chrome from flathub.
 flatpak install flathub com.google.Chrome
 ```
 
+Added dark mode flags for this flatpack to `.var/app/com.google.Chrome/config/chrome-flags.conf`.
+
 Installed gnome extension manager and used that to install caffeine extension.
 
 ```
