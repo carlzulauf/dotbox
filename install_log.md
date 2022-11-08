@@ -178,3 +178,23 @@ sudo apt install exa
 ```
 
 Going to need some nerd fonts for `exa` icons to show up right.
+
+Need keepass to get into github and make a public repo for this project
+
+```
+snap install keepassxc
+```
+
+Created and pushed to https://github.com/carlzulauf/dotbox/
+
+Installed google chrome from flathub.
+
+```
+flatpak install flathub com.google.Chrome
+```
+
+Installed gnome extension manager and used that to install caffeine extension.
+
+```
+sudo apt install gnome-shell-extension-manager
+```
