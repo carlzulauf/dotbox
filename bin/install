@@ -135,7 +135,7 @@ class InstallDotfiles < Struct.new(:options)
   # look for broken symlinks adjacent to the list of files
   def find_broken_symlinks(files)
     {}.tap do |found|
-      files.map(&:parent).uniq.flat_map do |dir|
+      files.map(&:parent).uniq.select(&:exist?).each do |dir|
         dir.children.select{ |f| f.symlink? && !f.exist? }.map do |broken_link|
           found[broken_link] = change("⊠", File.readlink(broken_link), broken_link) do
             puts "Removing broken symlink: `#{broken_link}`"
