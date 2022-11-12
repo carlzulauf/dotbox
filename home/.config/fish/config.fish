@@ -1,8 +1,6 @@
-  ## Starship prompt if we're interactive and starship in PATH
-if status --is-interactive
-  if which starship > /dev/null
-    source (starship init fish --print-full-init | psub)
-  end
+## Starship prompt if we're interactive and starship in PATH
+if status --is-interactive && which starship &> /dev/null
+  source (starship init fish --print-full-init | psub)
 end
 
 ## Advanced command-not-found hook, if found
