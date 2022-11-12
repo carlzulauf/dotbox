@@ -200,3 +200,151 @@ Installed gnome extension manager and used that to install caffeine extension.
 ```
 sudo apt install gnome-shell-extension-manager
 ```
+## Fedora Silverblue
+
+I think I'm starting to get an idea of how this works and want to jump in with both feet. Or, maybe like wade in slowly instead of dipping my toes. I'm going to try a real immutable operating system, Fedora Silverblue. On real hardware, as the only operating system. We'll see if I stick with it.
+
+I've nuked the existing garuda and ubuntu installs on my lenovo laptop. I backed them up first so not totally nuked. I mostly did this because I couldn't get the fedora installer to play nice with the existing installs.
+
+Here is what the backup looks like if you're wondering how to make a compressed drive image as fast as possible using all cores on your machine:
+
+Obviously, replace `/dev/nvme0n1p1` with the actual device you want to backup and `/path/to/backup.img.lbzip2` with wherever you want the backup file to live. Requires `lbzip2` compression utility.
+
+```
+sudo dd status=progress bs=16M if=/dev/nvme0n1p1 | lbzip > /path/to/backup.img.lbzip2
+```
+
+Getting into Fedora Silverblue I'm kind of shocked at how many core gnome apps are flatpaks.
+
+I followed the official user guide to enabling flathub, which involved going [here](https://flatpak.org/setup/Fedora), clicking the repo file link, and then opening it in the Gnome Software Center.
+
+### The Plan
+
+Going to try to lay out which packages I think should be flatpaks and which should be layered fedora packages.
+
+#### Flatpak packages
+
+Base
+
+```
+com.github.tchx84.Flatseal
+com.mattjakeman.ExtensionManager
+com.google.Chrome
+org.keepassxc.KeePassXC
+org.pulseaudio.pavucontrol
+com.github.zocker_160.SyncThingy
+org.gimp.GIMP
+org.inkscape.Inkscape
+org.signal.Signal
+org.videolan.VLC
+com.transmissionbt.Transmission
+com.github.jeromerobert.pdfarranger
+```
+
+I'd like to also try these gnome apps
+
+```
+org.gnome.Epiphany
+com.github.maoschanz.drawing
+com.github.hugolabe.Wike
+com.github.liferooter.textpieces
+```
+
+Video
+
+```
+com.obsproject.Studio
+org.kde.kdenlive
+us.zoom.Zoom
+fr.handbrake.ghb
+org.pitivi.Pitivi
+org.gnome.Cheese
+```
+
+Dev
+
+```
+io.atom.Atom
+com.visualstudio.code-oss
+com.visualstudio.code
+com.sublimetext.three
+org.kde.umbrello
+org.gaphor.Gaphor
+com.github.alecaddd.sequeler
+org.sqlitebrowser.sqlitebrowser
+org.gnome.Boxes
+```
+
+Gaming
+
+```
+com.valvesoftware.Steam
+com.mojang.Minecraft
+com.discordapp.Discord
+```
+
+#### Layered packages
+
+```
+fish
+exa
+tmux
+starship
+lbzip2
+direnv
+gparted
+gnome-tweaks
+ruby?
+```
+
+### Actually Installing Things
+
+Time to see if this is going to work. Going to need to install distrobox to have ruby as I'm not sure I want to layer that. But, first, a restart.
+
+Still gnome 42. Darn. Gnome 43 has some nice upgrades and some of the apps are updated, but not the core. Oh well. Might end up dual booting garuda or ubuntu 22.10 after all.
+
+Installed flatseal and extension manager by hand through software center. Used extension manager to install app indicator, caffeine, and ddterm gnome extensions.
+
+Installing just vscode flatpak to provide a base editor to migrate more of my dotfiles.
+
+```
+flatpak install flathub com.visualstudio.code-oss
+```
+
+While waiting for that, kicking off the distrobox install and creating an arch box.
+
+```
+curl -s https://raw.githubusercontent.com/89luca89/distrobox/main/install | sh -s -- --prefix ~/.local
+distrobox create -i archlinux arch-shell
+```
+
+Going to install some things that almost certainly need to be layered packages.
+
+```
+rpm-ostree install gnome-tweaks fish exa tmux lbzip2 direnv gparted
+```
+
+Reboot again.
+
+vs-code was showing in light mode. Tried setting `GTK_THEME=Adwaita-dark` env variable. Tried using gnome-tweaks to turn on `Adwaita-dark` for legacy apps (darkened title bar). Menus were still light until I finally installed `Adwaita-dark` flatpak. S.O. answers, fedora docs, flatpak dark mode guides... none of them suggested this. Found this in the flathub package maintainers guide. Ridiculously hard to figure out.
+
+```
+flatpak install flathub org.gtk.Gtk3theme.Adwaita-dark
+```
+
+Try to get ruby and some other stuff working in arch-shell
+
+```
+distrobox enter arch-shell
+as:$ sudo pacman -S which neofetch fish sysstat bind nano ruby ruby-webrick ruby-pry ruby-docs
+as:$ gem install redis
+```
+
+Last command installed gem into home folder shared by host, so visible in `~/.local/share/gem/ruby/3.0.0`.
+
+Still can't run dotbox installer cause no ruby on host. Exporting ruby from arch-shell.
+
+```
+as:$ distrobox-export --bin /usr/sbin/ruby --export-path ~/.local/bin
+as:$ distrobox-export --bin /usr/sbin/pry --export-path ~/.local/bin
+```
