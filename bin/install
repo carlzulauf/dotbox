@@ -3,11 +3,10 @@
 require "fileutils"
 require "pathname"
 require "optparse"
-require "json"
+require "digest/md5"
 
-DOTFILES_BASE_DIR = File.expand_path(
-  File.join(File.dirname(__FILE__), "..", "home")
-)
+DOTBOX_DIR = File.expand_path(File.join(File.expand_path(File.dirname(__FILE__)), ".."))
+DOTFILES_BASE_DIRS = [File.join(DOTBOX_DIR, "home"), File.join(DOTBOX_DIR, "home-files")]
 INSTALL_DIR = File.expand_path("~")
 BACKUP_DIR = File.expand_path("~/.backup-dotfiles")
 
@@ -37,14 +36,14 @@ class InstallDotfiles < Struct.new(:options)
           "-p [DIRECTORY]",
           "--private-dir [DIRECTORY]",
           "Add private directory for installer to layer into `#{options[:install_dir]}`.") do |dir|
-        options[:private_dirs] << dir
+        options[:private_dirs] << File.expand_path(dir)
       end
 
       parser.on(
           "-s [DIRECTORY]",
           "--dots-dir [DIRECTORY]",
-          "Directory with the base layer of dotfiles. Usually where most of them are. Default: `#{options[:dots_dir]}`.") do |dir|
-        options[:dots_dir] = File.expand_path(dir)
+          "Add directory as base layer of dotfiles. Usually where most of them are. Defaults: `#{DOTFILES_BASE_DIRS.join('; ')}`.") do |dir|
+        options[:dots_dirs] << File.expand_path(dir)
       end
     end.parse(argv)
     new(options)
@@ -52,9 +51,10 @@ class InstallDotfiles < Struct.new(:options)
 
   def self.default_options
     {
-      dots_dir: DOTFILES_BASE_DIR,
+      dots_dirs: [],
       install_dir: INSTALL_DIR,
       backup_dir: BACKUP_DIR,
+      symlinks: true,
       private_dirs: [],
     }
   end
@@ -80,8 +80,13 @@ class InstallDotfiles < Struct.new(:options)
     Pathname.new(options[:backup_dir])
   end
 
-  def dots_path
-    Pathname.new(options[:dots_dir])
+  def dotbox_dir
+    Pathname.new(DOTBOX_DIR)
+  end
+
+  def dots_paths
+    dirs = options[:dots_dirs].any? ? options[:dots_dirs] : default_base_dirs
+    dirs.map{ |dir| Pathname.new(dir) }.select(&:exist?)
   end
 
   def private_paths
@@ -89,22 +94,29 @@ class InstallDotfiles < Struct.new(:options)
     options[:private_dirs].map { |dir| Pathname.new(dir) }
   end
 
+  def default_base_dirs
+    DOTFILES_BASE_DIRS.map{ |dir| Pathname.new(dir) }.select(&:exist?)
+  end
+
   def default_private_paths
     [
-      dots_path.join("../../dotbox-private/home"),
-      dots_path.join("../private"),
-    ].select(&:exist?)
+      dotbox_dir.join("../dotbox-private/home"),
+      dotbox_dir.join("../dotbox-private/home-files"),
+      dotbox_dir.join("private"),
+      dotbox_dir.join("private-files"),
+    ]
   end
 
   def search_paths
-    [dots_path, *private_paths]
+    dots_paths + private_paths
   end
 
   def find_all_changes
     changes = {}
     search_paths.flat_map do |src|
       next unless src.directory?
-      find_changes(src, install_path).each do |change|
+      use_symlinks = !src.to_s.end_with?("-files")
+      find_changes(src, install_path, use_symlinks).each do |change|
         # final change to `dest` wins
         changes[change.dest] = change
       end
@@ -115,20 +127,20 @@ class InstallDotfiles < Struct.new(:options)
 
   # recursive. modified depth first search.
   # completes current dir before descending.
-  def find_changes(src, dest)
+  def find_changes(src, dest, symlinks)
     directories = []
     changes = []
     src.children.each do |child|
       if child.directory?
         directories << child
       elsif child.file?
-        changes << check_file(child, dest.join(child.basename))
+        changes << check_file(child, dest.join(child.basename), symlinks)
       else
         raise "wat (not file or directory, but child): #{child.inspect}"
       end
     end
     changes + directories.flat_map do |dir|
-      find_changes(dir, dest.join(dir.basename))
+      find_changes(dir, dest.join(dir.basename), symlinks)
     end
   end
 
@@ -163,7 +175,43 @@ class InstallDotfiles < Struct.new(:options)
     puts
   end
 
-  def check_file(src, dest)
+  def check_file(src, dest, use_symlink)
+    return check_symlink(src, dest) if use_symlink
+    check_file_content(src, dest)
+  end
+
+  def check_file_content(src, dest)
+    create_file = -> do
+      puts "Copying `#{src}` to `#{dest}`"
+      mkpath(dest.parent)
+      FileUtils.cp(src, dest)
+    end
+    if dest.exist?
+      if md5(src) == md5(dest)
+        change("✓", src, dest) # do nothing
+      else
+        change("⇄", src, dest) do
+          backup_existing_file(dest)
+          create_file.()
+        end
+      end
+    else
+      change("+", src, dest, &create_file)
+    end
+  end
+
+  def md5(path)
+    Digest::MD5.file(path)
+  end
+
+  def backup_existing_file(path)
+    dest = backup_path.join(path.relative_path_from(install_path))
+    puts "Moving existing file `#{path}` to `#{dest}`"
+    mkpath(dest.parent)
+    FileUtils.mv(path, dest)
+  end
+
+  def check_symlink(src, dest)
     create_symlink = -> do
       puts "Creating symlink to `#{src}` at `#{dest}`"
       mkpath(dest.parent)
@@ -180,10 +228,7 @@ class InstallDotfiles < Struct.new(:options)
       end
     elsif dest.exist?
       change("⇄", src, dest) do
-        backup_dest = backup_path.join(dest.relative_path_from(install_path))
-        puts "Moving existing file #{dest} to #{backup_dest}"
-        mkpath(backup_dest.parent)
-        FileUtils.mv(dest, backup_dest)
+        backup_existing_file(dest)
         create_symlink.()
       end
     else
@@ -219,14 +264,15 @@ class InstallDotfiles < Struct.new(:options)
     puts
     puts " --install-dir #{install_path}"
     puts " --backup-dir #{backup_path}"
-    puts " --dots-dir #{dots_path}"
-    private_paths.each { |path| puts " --private-dir #{path}"}
+    dots_paths.each { |path| puts " --dots-dir #{path}" }
+    private_paths.each { |path| puts " --private-dir #{path}" }
     puts
     separator
     puts "| dotfile changes for `#{install_path}`"
     separator
     puts
     puts "⊕ - create symlink"
+    puts "+ - create file"
     puts "⇄ - overwrite existing file (after backup)"
     puts "↺ - update symlink"
     puts "⊠ - remove broken symlink"
@@ -235,8 +281,8 @@ class InstallDotfiles < Struct.new(:options)
     changes.each do |change|
       puts " #{change.desc} #{change.dest}"
       puts "   ⤷ #{change.src}" if change.src
-      puts
     end
+    puts
     separator
   end
 
