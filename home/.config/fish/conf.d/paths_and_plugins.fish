@@ -9,3 +9,7 @@ end
 if which direnv &> /dev/null
   direnv hook fish | source
 end
+
+if test -f /opt/asdf-vm/asdf.fish
+  source /opt/asdf-vm/asdf.fish
+end
