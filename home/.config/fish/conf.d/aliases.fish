@@ -15,3 +15,6 @@ if which exa &> /dev/null
 else
   # ls aliases here
 end
+
+# flatpak shortcuts
+alias code='flatpak run com.visualstudio.code-oss'
