@@ -348,3 +348,23 @@ Still can't run dotbox installer cause no ruby on host. Exporting ruby from arch
 as:$ distrobox-export --bin /usr/sbin/ruby --export-path ~/.local/bin
 as:$ distrobox-export --bin /usr/sbin/pry --export-path ~/.local/bin
 ```
+
+Install script seemed to work (after a fix), but all the symlinks are to `/var/home/carl` which doesn't work from host. Might have to layer a system ruby?
+
+```
+rm ~/.local/bin/ruby
+rm ~/.local/bin/pry
+rpm-ostree install ruby
+```
+
+Reboot again. But, beforehand lets install a critical flatpaks so they are waiting for us and we can listen to youtube while washing dishes.
+
+```
+flatpak install flathub com.google.Chrome org.keepassxc.KeePassXC org.pulseaudio.pavucontrol com.github.zocker_160.SyncThingy org.gimp.GIMP org.inkscape.Inkscape org.signal.Signal org.videolan.VLC com.transmissionbt.Transmission com.github.jeromerobert.pdfarranger
+```
+
+Oh my that's a lot of disk space for the prerequisites. Guess I'm still using only 14GB of main partition so, whatever.
+
+Chrome works. Dark mode required replacing the chrome flags symlink with a real file. I think flatpak configs are going to require copying over real files, not symlinks. This means modifying the installer script. Whew, that took a while..
+
+Checked out fish first and discovered a couple copypasta issues in config. Updated.
