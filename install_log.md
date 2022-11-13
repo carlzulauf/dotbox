@@ -447,9 +447,11 @@ redis-server
 bin/rails db:create
 bin/rails db:test:prepare
 bundle exec rspec
-# all tests but some weird VCR failures pass. calling it a win.
+#
 ```
 
-Ok, no systemd in distroboxes. Have to launch services by hand, though maybe distrobox-export can export the service in a cleaner way. Everything seems to work though. Going to take a break and think about how to simplify or speedup getting into a working dev environment.
+All rails tests but some weird VCR failures pass. Calling it a win.
+
+No systemd in distroboxes. Have to launch services by hand, though maybe distrobox-export can export the service in a cleaner way. Everything seems to work though. Going to take a break and think about how to simplify or speedup getting into a working dev environment.
 
 Redis writes to the directory you run it in. Will need to maybe start it in ~/.local/share/redis in the future.
