@@ -368,3 +368,59 @@ Oh my that's a lot of disk space for the prerequisites. Guess I'm still using on
 Chrome works. Dark mode required replacing the chrome flags symlink with a real file. I think flatpak configs are going to require copying over real files, not symlinks. This means modifying the installer script. Whew, that took a while..
 
 Checked out fish first and discovered a couple copypasta issues in config. Updated.
+
+To have starship as my prompt I'm going to have to layer that too. Another reboot. I'm being punished for layering packages. Maybe that's good?
+
+```
+rpm-ostree install starship
+```
+
+Lots of icons aren't showing up right in exa and starship. Also, starship appears to be out of date as it's complaining about my 'container' config stanza.
+
+Added some nerd fonts to my `dotbox-private` repo since I'm not sure about re-distributing those and also don't want to put any big blobs in this repo if it's avoidable. I feel like fonts are also a deeply personal configuration. Maybe a lot of things this repo will configure by default belong in the camp of deeply personal, but I'm not ready to have fonts constitute the vast majority of bytes in this repo. That would definitely be the case with only a few of my favorite fonts added.
+
+Had to reboot again to get font selectors to see the fonts I put into `~/.local/share/fonts`.
+
+`chsh` isn't present so changed my shell to fish using `lchsh`, which appears to be the silverblue way.
+
+```
+sudo lchsh carl
+```
+
+Let's get fish+starship on arch. Fish installed previously. Using `chsh` to change it to fish. Also install starship.
+
+```
+distrobox enter arch-shell
+as:$ sudo chsh carl # change to /usr/sbin/fish
+as:$ sudo pacman -S starship
+```
+
+That was pretty easy.
+
+Time to try setting up asdf. Maybe we should use a separate distrobox for that? Going to start by cloing from this one and see.
+
+Started by cloning `arch-shell` distrobox into a new box: `arch-asdf`. Then, `yay` and try to install `asdf`.
+
+```
+distrobox create --name arch-asdf --clone arch-shell
+distrobox enter arch-asdf
+aa:$ sudo pacman -S --needed git base-devel openssh
+aa:$ git clone https://aur.archlinux.org/yay.git
+aa:$ cd yay
+aa:$ makepkg -si
+as:$ yay -S asdf-vm
+```
+
+Added fish config hook. Restarted arch-asdf session to check install. Seems to work. Installing ruby and node versions based on ssms.
+
+```
+asdf plugin add ruby
+asdf plugin add nodejs
+asdf install ruby 3.1.2
+asdf install nodejs 14.21.1
+# testing with a live app
+cd projects/spreadsheet_sms
+asdf local ruby 3.1.2
+asdf local ruby 14.21.1
+bundle install # fails because no pg lib (pqdev)
+```
