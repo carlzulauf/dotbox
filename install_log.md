@@ -411,7 +411,7 @@ aa:$ makepkg -si
 as:$ yay -S asdf-vm
 ```
 
-Added fish config hook. Restarted arch-asdf session to check install. Seems to work. Installing ruby and node versions based on ssms.
+Added fish config hook. Restarted arch-asdf session to check install. Seems to work. Installing ruby and node versions based on my spreadsheet_sms project.
 
 ```
 asdf plugin add ruby
@@ -423,4 +423,33 @@ cd projects/spreadsheet_sms
 asdf local ruby 3.1.2
 asdf local ruby 14.21.1
 bundle install # fails because no pg lib (pqdev)
+sudo pacman -S postgresql-libs
+bundle install # completed this time
+# need a real database and cache to see if the app works end-to-end
+sudo pacman -S postgresql redis
+
+# no systemd running so have to start postgresql by hand. going to try with current user.
+
+# initdb failed with missing locale. have to generate first.
+sudo nano /etc/locale.gen # uncommented en_US line
+sudo locale-gen en_US.UTF-8
+
+# init a postgres data dir under `~/.local/share` and start db server
+initdb --locale en_US.UTF-8 -D ~/.local/share/postgres/data
+postgresql-check-db-dir ~/.local/share/postgres/data
+# this creates a pg_hba.conf file in the postges folder that is set to 'trust'
+
+# in one tab, start postgres
+postgres -D ~/.local/share/postgres/data -k ~/.local/share/postgres
+# in another, start redis
+redis-server
+# in yet another, run the rails tests
+bin/rails db:create
+bin/rails db:test:prepare
+bundle exec rspec
+# all tests but some weird VCR failures pass. calling it a win.
 ```
+
+Ok, no systemd in distroboxes. Have to launch services by hand, though maybe distrobox-export can export the service in a cleaner way. Everything seems to work though. Going to take a break and think about how to simplify or speedup getting into a working dev environment.
+
+Redis writes to the directory you run it in. Will need to maybe start it in ~/.local/share/redis in the future.
