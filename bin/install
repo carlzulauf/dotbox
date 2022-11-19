@@ -68,10 +68,6 @@ class InstallDotfiles < Struct.new(:options)
 
   private
 
-  def ignored_files
-
-  end
-
   def install_path
     Pathname.new(options[:install_dir])
   end
@@ -194,6 +190,12 @@ class InstallDotfiles < Struct.new(:options)
           backup_existing_file(dest)
           create_file.()
         end
+      end
+    elsif dest.symlink? # broken symlink
+      change("+", src, dest) do
+        puts "Removing broken link at `#{dest}`"
+        dest.unlink
+        create_file.()
       end
     else
       change("+", src, dest, &create_file)
