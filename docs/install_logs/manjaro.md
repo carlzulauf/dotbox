@@ -6,21 +6,11 @@ OMG. None of the default gnome shortcuts work. Why would I want Super+Number to 
 
 The folks over at Manjaro seem to operate a most unhelpful forum. A couple questions opened about getting these back and both closed without anything approaching a solution to the Super shortcuts.
 
-This is what was supposed to fix it:
-
-```
-sudo pacman -R manjaro-gnome-extension-settings
-```
+Removing `manjaro-gnome-extension-settings` was supposed to fix it. It did not.
 
 I'm so far down this rabbit hole now and I'm determined to understand what's going on and notate it because this has happened before and I'm sick of having no solution to deep gnome config issues like this.
 
 I think we have to look around here: `/usr/share/glib-2.0/schemas`
-
-Going to remove a couple extensions fully:
-
-```
-sudo pacman -R gnome-shell-extension-dash-to-dock gnome-shell-extension-dash-to-panel
-```
 
 Ok, so, it looks like `gnome-shell` has global (xml) settings with the correct keybindings but for some reason the gsettings database says different. No amount of removing packages will solve that. The settings for `switch-to-application` are cleared out:
 
@@ -64,16 +54,12 @@ $ gsettings set org.gnome.shell.keybindings switch-to-application-9 "['<Super>9'
 => [true, true, true, true, true, true, true, true, true]
 ```
 
-I guess we can add back the stuff we removed since it didn't make a difference. Getting back to stock Manjaro with those gsettings applied. Also, ruby.
-
-```
-sudo pacman -S manjaro-gnome-extension-settings gnome-shell-extension-dash-to-dock gnome-shell-extension-dash-to-panel
-```
+I guess we can add back the stuff we removed since it didn't make a difference. Getting back to stock Manjaro with those gsettings applied.
 
 We can install the dot files now and some essentials.
 
 ```
-sudo pacman -S fish exa starship tmux direnv neofetch bind sysstat ruby-webrick ruby-docs ttf-ubuntumono-nerd
+sudo pacman -S fish exa starship tmux direnv neofetch bind sysstat ruby ruby-pry ruby-webrick ruby-docs ttf-ubuntumono-nerd
 ```
 
 Then used `chsh` to change to fish.
