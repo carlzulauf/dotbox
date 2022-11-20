@@ -78,8 +78,36 @@ Going to start installing distrobox and get ssms working fully via asdf.
 curl -s https://raw.githubusercontent.com/89luca89/distrobox/main/install | sh -s -- --prefix ~/.local
 ```
 
-Looks like I'm going to need some container infrastructure. Going with podman as I think non-priveleged containers are easier there. I don't want to deal with user groups.
+Looks like I'm going to need some container infrastructure. Going with podman as I think non-priveleged containers are easier there. I don't want to deal with user groups. Also, we're rocking an old LTS kernel (5.15). Moving up to 6.0.
 
 ```
-sudo pacman -S podman podman-docker podman-compose
+sudo pacman -S podman podman-docker podman-compose linux60 linux60-headers
 ```
+
+Still can't create containers. Complains about `carl` not having `subuid` ranges in `/etc/subuid`. Guess we have to check the docs for "rootless mode".
+
+```
+sudo usermod --add-subuids 100000-199999 --add-subgids 100000-199999 carl
+podman system migrate
+distrobox create -i archlinux arch-shell
+distrobox enter arch-shell
+as:$ sudo pacman -S which neofetch sysstat bind nano ruby ruby ruby-pry ruby-docs starship git man-db
+```
+
+Everything is working. Not sure where services should live. Maybe I should take the most space efficient approach? Starting with redis, here are some options I see:
+
+* Just start the official redis container from dockerhub via a single docker command.
+* Use `Dockerfile`/`docker-compose.yml` and launch service the old fashion way.
+* Make a distrobox from one of the following starting points:
+  * existing arch-shell image
+  * official redis image
+  * alpine
+  * arch
+
+Found example of using custom Dockerfile [here](https://github.com/89luca89/distrobox/blob/main/docs/distrobox_gentoo.md).
+
+## How do we measure the disk space of images?
+
+We can get some idea from `podman images --all`, but not sure if there are lots of volumes I might not be seeing. `podman volume ls` lists the volumes, but doesn't say where they are or how big.
+
+## Could cloning from an existing distrobox be the most space efficient?
