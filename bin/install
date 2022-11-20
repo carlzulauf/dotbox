@@ -10,7 +10,9 @@ DOTFILES_BASE_DIRS = [File.join(DOTBOX_DIR, "home"), File.join(DOTBOX_DIR, "home
 INSTALL_DIR = File.expand_path("~")
 BACKUP_DIR = File.expand_path("~/.backup-dotfiles")
 
-Change = Struct.new(:desc, :src, :dest, :action)
+Change = Struct.new(:desc, :src, :dest, :action) do
+  def noop?; desc == "✓"; end
+end
 
 class InstallDotfiles < Struct.new(:options)
   def self.parse(argv)
@@ -273,18 +275,27 @@ class InstallDotfiles < Struct.new(:options)
     puts "| dotfile changes for `#{install_path}`"
     separator
     puts
+    unchanged, changed = changes.partition(&:noop?)
+    if unchanged.any?
+      unchanged.each do |change|
+        puts " #{change.desc} #{change.dest}"
+      end
+      puts
+    end
+    puts "✓ - no change"
     puts "⊕ - create symlink"
     puts "+ - create file"
     puts "⇄ - overwrite existing file (after backup)"
     puts "↺ - update symlink"
     puts "⊠ - remove broken symlink"
-    puts "✓ - no change"
     puts
-    changes.each do |change|
-      puts " #{change.desc} #{change.dest}"
-      puts "   ⤷ #{change.src}" if change.src
+    if changed.any?
+      changed.each do |change|
+        puts " #{change.desc} #{change.dest}"
+        puts "   ⤷ #{change.src}" if change.src
+      end
+      puts
     end
-    puts
     separator
   end
 
