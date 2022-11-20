@@ -1,0 +1,22 @@
+---
+- abbr: dotb
+  dir: "~/projects/dotbox"
+  names:
+  - dotb
+  - dotbox
+  windows: 3
+  labels:
+  -
+  - pry
+  # commands are pre-filled into corresponding window
+  commands:
+  -
+  - pry
+  start: false # don't run pre-filled commands
+- abbr: dotp
+  dir: "~/projects/dotbox-private"
+  names:
+  - dotp
+  - dotbox-private
+  - dotpriv
+  windows: 2

@@ -1,0 +1,117 @@
+#!/usr/bin/env ruby
+
+require "yaml"
+
+# Usage:
+# tproj <- get a list of available projects (configured below)
+# tproj project-name <- start or resume a specific project
+
+# looks in ~/.config/tproj.conf for project configs
+
+class Project
+  attr_reader :options
+
+  def initialize(options)
+    @options  = options
+  end
+
+  def dir
+    options.fetch("dir") { Dir.pwd }
+  end
+
+  def abbr
+    options.fetch("abbr") { rand(0..0xffff).to_s(16) }
+  end
+
+  def names
+    options.fetch("names") { [abbr] }
+  end
+
+  def windows
+    [
+      options.fetch("windows") { 1 },
+      commands.count,
+      labels.count
+    ].max
+  end
+
+  def commands
+    options.fetch("commands") { [] }
+  end
+
+  def labels
+    options.fetch("labels") { [] }
+  end
+
+  def start
+    options.fetch("start") { false }
+  end
+end
+
+def default_config_path
+  File.expand_path("~/.config/tproj.yml")
+end
+
+def projects(path = default_config_path)
+  YAML.load_file(path).map { |config| Project.new(config) }
+end
+
+def create_project(abbr, dir, windows = 1, *_)
+  windows = [windows.to_i, 1].max
+  Project.new({
+    "abbr"    => abbr,
+    "dir"     => dir,
+    "windows" => windows,
+  })
+end
+
+def find_project(name)
+  projects.each do |project|
+    return project if project.names.member?(name)
+  end
+  STDERR.puts "Project not found: #{ARGV[0].inspect}"
+  exit 1
+end
+
+current =
+  if ARGV[0] && ARGV[1]
+    create_project(*ARGV)
+  elsif ARGV[0]
+    find_project(ARGV[0])
+  else
+    names = projects.map(&:abbr).join(", ")
+    puts "Example: tproj project-name"
+    puts "Example: tproj abbr dir [windows=1]"
+    puts "Available projects: #{names}"
+    exit
+  end
+
+existing_sessions = `tmux list-sessions`.split("\n")
+match = existing_sessions.detect { |x| x.split(":")[0] == current.abbr }
+
+print "\033]0;tmux: #{current.names.first}\007"
+exec "tmux attach -t #{current.abbr}" if match
+
+Dir.chdir File.expand_path(current.dir)
+system "tmux new -s #{current.abbr} -d"
+delayed = []
+1.step(to: current.windows) do |n|
+  cmd, label = current.commands[n - 1], current.labels[n - 1]
+  system "tmux new-window -t #{current.abbr}" unless n == 1
+  if cmd
+    tmux_command = ["tmux", "send-keys", "-t", "#{current.abbr}:#{n}", cmd]
+    tmux_command << "Enter" if cmd && current.start
+    delayed << tmux_command
+  end
+  if label
+    system "tmux", "rename-window", "-t", "#{current.abbr}:#{n}", label
+  end
+end
+
+if delayed.any?
+  sleep 1 # give shell a chance so prompt is drawn before keys
+  delayed.each { |cmd| system(*cmd) }
+end
+
+system "tmux select-window -t #{current.abbr}:1"
+exec "tmux attach -t #{current.abbr}" unless ARGV[1] =~ /silent/
