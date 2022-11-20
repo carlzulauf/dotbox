@@ -5,6 +5,11 @@ if test -d ~/.local/bin
   end
 end
 
+# Add user bins from latest ruby path
+if test -d ~/.local/share/gem/ruby/3.0.0/bin
+  set --append PATH ~/.local/share/gem/ruby/3.0.0/bin
+end
+
 # initialize direnv, if installed
 if which direnv &> /dev/null
   direnv hook fish | source
