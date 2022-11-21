@@ -17,4 +17,14 @@ else
 end
 
 # flatpak shortcuts
-alias code='flatpak run com.visualstudio.code-oss'
+
+if test -d ~/.var/app/com.visualstudio.code-oss/data/
+  alias code='flatpak run com.visualstudio.code-oss'
+  alias codo='flatpak run com.visualstudio.code-oss'
+end
+
+if test -d ~/.var/app/com.visualstudio.code/data/
+  alias code='flatpak run com.visualstudio.code'
+  alias vscode='flatpak run com.visualstudio.code'
+  alias vsc='flatpak run com.visualstudio.code'
+end
