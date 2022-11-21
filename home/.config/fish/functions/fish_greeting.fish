@@ -1,5 +1,5 @@
 function fish_greeting
-  if which neofetch &> /dev/null
+  if type -q neofetch
     # if it's not set up, setup the global with a value that will show MOTD
     # Note: if you are time traveling prior to the unix epoch you will need to
     #       initialize this variable with a sufficiently negative value.

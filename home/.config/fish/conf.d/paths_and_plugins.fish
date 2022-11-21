@@ -11,7 +11,7 @@ if test -d ~/.local/share/gem/ruby/3.0.0/bin
 end
 
 # initialize direnv, if installed
-if which direnv &> /dev/null
+if type -q direnv
   direnv hook fish | source
 end
 
