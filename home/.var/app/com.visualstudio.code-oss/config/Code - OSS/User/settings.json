@@ -1,0 +1,11 @@
+// ~/.var/app/com.visualstudio.code-oss/config/Code - OSS/User/settings.json
+{
+  "workbench.colorTheme": "Default Dark+",
+  "workbench.startupEditor": "none",
+  "editor.fontFamily": "'UbuntuMono Nerd Font', 'FantasqueSansMono Nerd Font', 'Droid Sans Mono', 'monospace', monospace",
+  "editor.tabSize": 2,
+  "files.insertFinalNewline": true,
+  "files.trimFinalNewlines": true,
+  "files.trimTrailingWhitespace": true,
+  "editor.fontSize": 16
+}
