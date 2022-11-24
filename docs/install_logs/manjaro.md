@@ -1,4 +1,4 @@
-## Manjaro
+# Manjaro
 
 Flatpaks easy to switch on through Pamac preferences.
 
@@ -54,6 +54,15 @@ $ gsettings set org.gnome.shell.keybindings switch-to-application-9 "['<Super>9'
 => [true, true, true, true, true, true, true, true, true]
 ```
 
+Foudn some more conflicting keybindings here, which I cleared out:
+
+```
+gsettings list-recursively org.gnome.desktop.wm.keybindings
+gsettings set org.gnome.desktop.wm.keybindings switch-to-workspace-5 "[]"
+gsettings set org.gnome.desktop.wm.keybindings switch-to-workspace-6 "[]"
+...
+```
+
 I guess we can add back the stuff we removed since it didn't make a difference. Getting back to stock Manjaro with those gsettings applied.
 
 We can install the dot files now and some essentials.
@@ -91,7 +100,7 @@ sudo usermod --add-subuids 100000-199999 --add-subgids 100000-199999 carl
 podman system migrate
 distrobox create -i archlinux arch-shell
 distrobox enter arch-shell
-as:$ sudo pacman -S which neofetch sysstat bind nano ruby ruby ruby-pry ruby-docs starship git man-db
+as:$ sudo pacman -S which neofetch sysstat smartmontools iotop bind nano ruby ruby ruby-pry ruby-docs starship git man-db
 ```
 
 Everything is working. Not sure where services should live. Maybe I should take the most space efficient approach? Starting with redis, here are some options I see:
@@ -111,3 +120,57 @@ Found example of using custom Dockerfile [here](https://github.com/89luca89/dist
 We can get some idea from `podman images --all`, but not sure if there are lots of volumes I might not be seeing. `podman volume ls` lists the volumes, but doesn't say where they are or how big.
 
 ## Could cloning from an existing distrobox be the most space efficient?
+
+Maybe, but starting from the official container seems more straightforward.
+
+## Dokku
+
+Moved work on a local dokku to another doc.
+
+## More Installs
+
+Installing some more flatpaks:
+
+```
+flatpak install flathub com.visualstudio.code
+```
+
+## Additional Storage
+
+Added a 2TB SSD to the laptop and formatted it as btrfs using gparted. I want to have a subvolume mounted in my home directory as `files`. There is no way to containerize this process.
+
+Mount point for root filesystem will be `/mnt/swamp`. UUID of btrfs partition is `3eb0140d-1038-4232-96c7-46b0ad63ebbf`.
+
+First, make the mount point: `$ sudo mkdir /mnt/swamp`
+
+Added the following to `/etc/fstab`:
+
+```
+# swamp
+UUID=3eb0140d-1038-4232-96c7-46b0ad63ebbf /mnt/swamp     btrfs   subvol=/,defaults,discard=async,ssd 0 0
+```
+
+Then refreshed config and mounted the root filesystem. Added a subvolume and created mount point for it.
+
+```
+sudo systemctl daemon-reload
+sudo mount /mnt/swamp
+sudo btrfs subvolume create /mnt/swamp/@files
+sudo mkdir /mnt/files
+```
+
+Add another line to `/etc/fstab`:
+
+```
+UUID=3eb0140d-1038-4232-96c7-46b0ad63ebbf /mnt/files     btrfs   subvol=/@files,defaults,discard=async,ssd 0 0
+```
+
+Reload config again, mount subvolume, create user owned folder within, and link into home directory:
+
+```
+sudo systemctl daemon-reload
+sudo mount /mnt/files
+sudo mkdir /mnt/files/carl
+sudo chown carl:carl /mnt/files/carl
+ln -s /mnt/files/carl ~/files
+```
