@@ -104,3 +104,41 @@ nyc_building_search
 [1] pry(#<Console>)> db
 # => { ... your data ... }
 ```
+
+### `git-clean-local`
+
+Utility for clearing out local stale git branches. Provides a basic console UI with confirmation process, so safe to run and see what it will do.
+
+See `git-clean-local --help` for command line options.
+
+Can be treated as a git sub-command: `git clean-local`
+
+### `git-pullf`
+
+Shortcut to force pull from the current tracking branch.
+
+Similar to running this, but less verbose:
+
+```
+git pull --force upstream_remote upstream_branch:current_branch
+```
+
+Can be treated as a git sub-command: `git pullf`
+
+### `git-pushu`
+
+Behaves like `git push` unless there is no remote tracking branch, in which case it tries to set that up.
+
+Assumes you want your local branch to track a branch of the same name on the default remote repository.
+
+Can be treated as a git sub-command: `git pushu`
+
+### `pjson`
+
+Pretty-print JSON
+
+Takes json, supplied via STDIN or from file names passed to the script, parses it, and spits it back out nicely formatted.
+
+### `prepend_command`
+
+Not sure what arguments are being sent to a command? Just prepend the command name with `prepend_command` and the full command will be printed to the console before being executed.

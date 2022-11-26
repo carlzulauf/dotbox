@@ -1,0 +1,5 @@
+#!/usr/bin/env ruby
+
+cmd = ARGV.join(" ")
+puts " $ #{cmd}"
+system *ARGV

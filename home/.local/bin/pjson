@@ -1,0 +1,33 @@
+#!/usr/bin/env ruby
+
+# Pretty print json
+#
+# Reads JSON from file(s) or from STDIN
+#
+# Usage:
+#
+#     cat my_json.json | pjson
+#     pjson my_json.json
+#     pjson file1.json file2.json
+#
+
+require 'json'
+
+jsons = ARGV.map do |file|
+  begin
+    File.read(file)
+  rescue
+    puts "Cannot read file: #{file}"
+  end
+end
+
+jsons << STDIN.read unless STDIN.tty?
+jsons.compact!
+
+jsons.each do |json|
+  begin
+    puts JSON.pretty_generate JSON.parse(json)
+  rescue JSON::ParserError => e
+    puts "Not valid JSON"
+  end
+end
