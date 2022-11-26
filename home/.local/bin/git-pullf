@@ -1,0 +1,13 @@
+#!/usr/bin/env ruby
+
+# git pullf
+# ---------
+# Force pull without needing to be verbose
+
+current = `git for-each-ref --format='%(upstream:short)' $(git symbolic-ref -q HEAD)`
+remote, remote_branch = current.strip.split("/", 2)
+branch = `git branch | grep \\* | cut -d ' ' -f2`
+
+command = "git pull --force #{remote} #{remote_branch}:#{branch}"
+puts command
+exec command

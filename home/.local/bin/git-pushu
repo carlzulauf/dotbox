@@ -1,0 +1,28 @@
+#!/usr/bin/env ruby
+
+# git pushu
+# ---------
+#
+# Push upstream every time
+#
+#  * If the current branch tracks a remote, push to it.
+#
+#  * If there is no tracking branch, point to a branch of the same name,
+#    on the first remote listed in `git remote`
+#
+# TODO: make remote configurable
+
+local_branch = `git name-rev --name-only HEAD`.strip
+remote_repo = `git remote`.lines.first.strip
+remote_branch = `git config branch.#{local_branch}.merge`
+
+def run(command)
+  puts command
+  exec command
+end
+
+if remote_branch.empty?
+  run "git push --set-upstream #{remote_repo} #{local_branch}"
+else
+  run "git push"
+end

@@ -1,0 +1,149 @@
+#!/usr/bin/env ruby
+
+# git clean-local
+# ---------------
+# Clean out your local branches. Defaults to branches you haven't touched in 30+ days.
+#
+# More info: git clean-local -h
+#
+# Asks for confirmation by default, so safe to run with no options.
+
+require 'time'
+require 'optparse'
+
+DEFAULT_CUTOFF_DAYS = 30
+
+class Cleaner
+  attr_accessor :keeplist, :removelist, :cutoff_days, :confirm, :dry_run, :keep, :skip, :remove
+
+  def initialize(options = {})
+    @keeplist     = %W(main master #{current_branch}).uniq
+    @removelist   = []
+    @cutoff_days  = DEFAULT_CUTOFF_DAYS
+    @confirm      = false
+    @dry_run      = false
+    @keep         = []
+    @skip         = []
+    @remove       = []
+  end
+
+  def perform
+    partition_branches
+    summarize
+    remove_branches
+  end
+
+  def partition_branches
+    local_refs.each do |last_sha, branch_name, updated_str|
+      updated_at = Time.parse(updated_str)
+      if keep_branch?(branch_name)
+        skip << branch_name
+      elsif updated_at > cutoff
+        keep << branch_name
+      elsif remove_branch?(branch_name)
+        remove << branch_name
+      else
+        skip << branch_name
+      end
+    end
+  end
+
+  def keep_branch?(name)
+    keeplist.each do |pattern|
+      case pattern
+      when String
+        return true if name == pattern
+      when Regexp
+        return true if name =~ pattern
+      end
+    end
+    return false
+  end
+
+  def remove_branch?(branch)
+    return true if removelist.empty?
+    removelist.each do |pattern|
+      return true if branch =~ pattern
+    end
+    return false
+  end
+
+  def summarize
+    puts "Branches explicitly kept (on keep list):"
+    skip.each { |b| puts "  #{b}" }
+    puts
+    puts "Recently (past #{cutoff_days} days) updated branches to keep:"
+    keep.each { |b| puts "  #{b}" }
+    puts
+    puts "Branches to remove:"
+    remove.each { |b| puts "  #{b}" }
+  end
+
+  def remove_branches
+    return if dry_run
+    return unless confirm || user_confirmed?
+    remove.each do |branch|
+      puts "Removing #{branch}"
+      `git branch -D #{branch}`
+    end
+  end
+
+  def user_confirmed?
+    puts "Are you sure you want to remove these branches? ([Y]es/[N]o)"
+    answer = gets.strip
+    answer =~ /^y(es)?$/i
+  end
+
+  def current_branch
+    `git name-rev --name-only HEAD`.strip
+  end
+
+  def local_refs
+    `git for-each-ref refs/heads --format='%(objectname)\t%(refname:short)\t%(creatordate)'`.lines.map { |l| l.split("\t").map(&:strip) }
+  end
+
+  def cutoff
+    @cutoff ||= Time.now - (60*60*24*cutoff_days)
+  end
+
+  def self.parse(args)
+    opts = self.new
+    parser = OptionParser.new do |o|
+      o.banner = "Usage: git clean-local [options]"
+
+      o.on("-y", "--yes", "--confirm", "Perform branch removals without asking") do
+        opts.confirm = true
+      end
+
+      o.on("--no", "--dry-run", "Show branches which will be removed, but don't remove them") do
+        opts.dry_run = true
+      end
+
+      o.on("--keep=KEEPLIST", "Comma seperated list of branch patterns to skip. Replaces default: #{opts.keeplist.join(',')}.") do |list|
+        opts.keeplist = list.split(",").map do |keeplist_item|
+          /#{keeplist_item}/
+        end
+      end
+
+      o.on("--remove=REMOVELIST", "Comma separated list of branch patterns to remove") do |list|
+        opts.removelist = list.split(",").map do |removelist_item|
+          /#{removelist_item}/
+        end
+      end
+
+      o.on("--cutoff=DAYS", "Keep branches that have been updated in past number of days. Default: #{DEFAULT_CUTOFF_DAYS}") do |days|
+        opts.cutoff_days = days.to_i
+      end
+
+      o.on("-h", "The thing you probably just ran") do
+        puts o
+        exit
+      end
+    end
+
+    parser.parse!(args)
+    opts
+  end
+end
+
+Cleaner.parse(ARGV).perform
