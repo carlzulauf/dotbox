@@ -56,3 +56,51 @@ Usually symlinks work fine. Any edits to the symlink will be reflected in the li
 I have encountered instances, like the flatpak version of Google Chrome, where symlinks will not work. `home-files/` are for those cases and will copy the file contents instead.
 
 If you make a change to the installed copy of a `home-files/` dotfile you might find those changes erased the next time you run the installer. The installer will see the md5 hash of the file does not match the one in `home-files/` and will move the modified dotfile to `~/.backup-dotfiles` before replacing it. Make any changes in `home-files/` and re-run the installer to apply them.
+
+## Installed Executables
+
+These are executable scripts installed into `~/.local/bin` when you run `bin/install_dotfiles`. They are a collection of small workflow helpers that haven't yet grown large enough to be projects unto themselves.
+
+All scripts require `ruby` unless otherwise noted.
+
+### `tproj`
+
+Project setup script for tmux.
+
+Allows you to define per project configuration (in `~/.config/tproj.yml`). When started with a pre-configured project name a tmux session will be created in the project directory with the specified windows, labels, and commands.
+
+See the [included config](home/.config/tproj.yml) for some examples. Once configured a project can be launched by referring to it's abbreviation or any of the listed names. Launching a tmux session for the dotbox project might look like this:
+
+```
+tproj dotbox
+```
+
+You can also create sessions for projects that are not yet configured supplying more details to the command. If you want a tmux session with 5 windows for `~/project/my_project` it might look like this:
+
+```
+tproj mine ~/projects/my_project 5
+```
+
+### `console_saver`
+
+**Requires**: `pry` gem for ruby. Install `ruby-pry` with your package manager or `gem install pry` to run.
+
+Creates a pry session with a `db` hash and a `save` method. When you call `save` the `db` hash is serialized into the console script itself (using ruby's `__END__` and `DATA` features). Next time you run the console the serialized data will be parsed and restored into the `db` object.
+
+Useful if you are exploring data or something and need a quick place to store data. Especially useful to copy this executable to a new name based on the topic you are researching. Then you've got a portable single file db with interface.
+
+Example:
+
+```
+# create new executable and run it
+cp home/.local/bin/console_saver private/home/.local/bin/nyc_building_search
+nyc_building_search
+# build and save your database
+[1] pry(#<Console>)> # <import your database into `db`>
+[2] pry(#<Console>)> save
+[4] pry(#<Console>)> exit
+# next run your data will be there
+nyc_building_search
+[1] pry(#<Console>)> db
+# => { ... your data ... }
+```
