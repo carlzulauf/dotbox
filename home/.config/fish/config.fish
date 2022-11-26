@@ -1,5 +1,5 @@
 ## Starship prompt if we're interactive and starship in PATH
-if status --is-interactive && which starship &> /dev/null
+if status --is-interactive && type -q starship
   source (starship init fish --print-full-init | psub)
 end
 
