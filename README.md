@@ -142,3 +142,7 @@ Takes json, supplied via STDIN or from file names passed to the script, parses i
 ### `prepend_command`
 
 Not sure what arguments are being sent to a command? Just prepend the command name with `prepend_command` and the full command will be printed to the console before being executed.
+
+### `untilfail`
+
+Bash script that runs the supplied command, repeatedly, until a non-zero exit code is received.
