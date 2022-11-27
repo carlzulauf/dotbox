@@ -135,6 +135,39 @@ Installing some more flatpaks:
 flatpak install flathub com.visualstudio.code
 ```
 
+My dockerfiles won't build. Turns out podman is configured to require fully qualified container names including the registry. Docker.io should be a given, so adding a file with these contents to `/etc/containers/registries.conf.d/search-registries.conf`. Found an example [here](https://github.com/containers/podman/blob/main/test/registries.conf)
+
+```
+unqualified-search-registries = ['docker.io', 'quay.io']
+```
+
+## asdf via distrobox
+
+Trying to get a real fully working example of using asdf via distrobox to run my rails app, ssms. Not just tests, but the full thing with containers for postgres and redis.
+
+```
+distrobox create --clone arch-shell arch-asdf
+distrobox enter arch-asdf
+aa:$ sudo pacman -Syu base-devel
+aa:$ cd ~/projects/0wnloads/yay
+aa:$ makepkg -si
+aa:$ yay -S asdf-vm
+aa:$ exit
+# need to re-enter distrobox for asdf to be in path
+```
+
+Now, inside the `arch-asdf` distrobox and within the ssms project directory, we install the versions we need.
+
+```
+asdf plugin add ruby
+asdf plugin add nodejs
+asdf plugin add yarn
+asdf install ruby 3.1.2
+asdf install nodejs 14.21.1
+asdf local ruby 3.1.2
+asdf local nodejs 14.21.1
+```
+
 ## Additional Storage
 
 Added a 2TB SSD to the laptop and formatted it as btrfs using gparted. I want to have a subvolume mounted in my home directory as `files`. There is no way to containerize this process.
