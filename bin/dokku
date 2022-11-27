@@ -1,0 +1,59 @@
+#!/usr/bin/env ruby
+
+# Starts the dokku platform-in-a-box, in a container. Assumes podman installed and current user has access to the podman socket.
+#
+# A container that manages containers. Amazing.
+
+require 'pry'
+require "json"
+
+def r(*cmd)
+  puts "$ #{cmd.join(' ')}"
+  system cmd.join(' ')
+end
+
+# user = ENV["USER"]
+uid = Process.uid
+local_files = File.expand_path("~/.local/dokku")
+
+version = "0.28.4"
+
+# should be able to replace these with docker details
+imager = "podman"
+imager_socket = "/run/user/#{uid}/podman/podman.sock"
+
+image_name = "docker.io/dokku/dokku:#{version}"
+
+ssh_port  = 3022
+http_port = 8080
+ssl_port  = 8443
+
+run_options = <<~PODMANOPTIONS.lines(chomp: true)
+  --env DOKKU_HOSTNAME=dokku.me
+  --env DOKKU_HOST_ROOT=/var/lib/dokku/home/dokku
+  --name dokku
+  --publish #{ssh_port}:22
+  --publish #{http_port}:80
+  --publish #{ssl_port}:443
+  --volume #{local_files}:/mnt/dokku
+  --volume #{imager_socket}:/var/run/docker.sock
+  --detach
+PODMANOPTIONS
+
+images = JSON.parse(`podman images --format json`)
+if images.none? { |i| i["Names"].member?(image_name) }
+  r "podman pull #{image_name}"
+end
+
+containers = JSON.parse(`podman container list --all --format json`)
+if containers.any? { |c| c["Image"] == image_name }
+  r "podman container start dokku"
+else
+  r "podman container run", *run_options, "dokku/dokku:#{version}"
+end
+
+r "podman exec -it -w /root dokku bash"
+
+puts "dokku bash exited, stopping container"
+
+r "podman container stop dokku"
