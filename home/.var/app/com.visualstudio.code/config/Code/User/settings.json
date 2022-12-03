@@ -7,5 +7,6 @@
   "files.insertFinalNewline": true,
   "files.trimFinalNewlines": true,
   "files.trimTrailingWhitespace": true,
-  "editor.fontSize": 16
+  "editor.fontSize": 16,
+  "explorer.autoReveal": false
 }
