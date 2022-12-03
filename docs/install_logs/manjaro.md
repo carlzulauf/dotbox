@@ -164,8 +164,17 @@ asdf plugin add nodejs
 asdf plugin add yarn
 asdf install ruby 3.1.2
 asdf install nodejs 14.21.1
+asdf install yarn latest
 asdf local ruby 3.1.2
 asdf local nodejs 14.21.1
+asdf local yarn latest
+```
+
+Now we install the ruby and javascript requirements for the app.
+
+```
+yarn install
+bundle install
 ```
 
 ## Additional Storage
