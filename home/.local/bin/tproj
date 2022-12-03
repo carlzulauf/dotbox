@@ -1,12 +1,14 @@
 #!/usr/bin/env ruby
 
 require "yaml"
+require "open3"
 
 # Usage:
 # tproj <- get a list of available projects (configured below)
 # tproj project-name <- start or resume a specific project
 
 # looks in ~/.config/tproj.conf for project configs
+DEBUG = false
 
 class Project
   attr_reader :options
@@ -46,10 +48,26 @@ class Project
   def start
     options.fetch("start") { false }
   end
+
+  def tmux_cmd(*args)
+    box = options["distrobox"]
+    base = if box
+      "distrobox-enter #{box} -- tmux -S ~/.local/share/tmux-#{box}.sock"
+    else
+      "tmux"
+    end
+    return base unless args.any?
+    [base, *args].join(" ")
+  end
 end
 
 def default_config_path
   File.expand_path("~/.config/tproj.yml")
+end
+
+def fatal_error(msg, exit_status = 1)
+  STDERR.puts msg
+  exit exit_status
 end
 
 def projects(path = default_config_path)
@@ -69,42 +87,76 @@ def find_project(name)
   projects.each do |project|
     return project if project.names.member?(name)
   end
-  STDERR.puts "Project not found: #{ARGV[0].inspect}"
-  exit 1
+  fatal_error "Project not found: #{ARGV[0].inspect}"
 end
 
-current =
-  if ARGV[0] && ARGV[1]
-    create_project(*ARGV)
-  elsif ARGV[0]
-    find_project(ARGV[0])
-  else
-    names = projects.map(&:abbr).join(", ")
-    puts "Example: tproj project-name"
-    puts "Example: tproj abbr dir [windows=1]"
-    puts "Available projects: #{names}"
-    exit
-  end
+def find_existing_sessions(proj)
+  cmd = proj.tmux_cmd("list-sessions")
+  puts "$ #{cmd}" if DEBUG
+  stdout, _stderr, status = Open3.capture3(cmd)
+  return [] if !status.success?
+  stdout.split("\n").map {|line| line.split(":").first }
+end
 
-existing_sessions = `tmux list-sessions`.split("\n")
-match = existing_sessions.detect { |x| x.split(":")[0] == current.abbr }
+def find_current_project(abbr = nil, window = nil, *others)
+  # if user specifies both abbr and window, assume we want a new project
+  return create_project(abbr, window, *others) if abbr && window
+  # if just an abbreviation, look it up
+  return find_project(abbr) if abbr
+  # otherwise, print out usage
+  names = projects.map(&:abbr).join(", ")
+  puts "Example: tproj project-name"
+  puts "Example: tproj abbr dir [windows=1]"
+  puts "Available projects: #{names}"
+  exit
+end
 
-print "\033]0;tmux: #{current.names.first}\007"
-exec "tmux attach -t #{current.abbr}" if match
+def set_terminal_title(title)
+  print "\033]0;#{title}\007"
+end
 
+def run(cmd)
+  puts "$ #{cmd}" if DEBUG
+  system cmd
+end
+
+# Convert a command into a set of tmux send-keys values
+def keys_escape(cmd)
+  # convert 'word1 word2' to 'word1 Space word2'
+  cmd.gsub(/\s+/, ' Space ')
+end
+
+current = find_current_project(*ARGV)
+set_terminal_title("tmux: #{current.names.first}")
+
+if find_existing_sessions(current).member?(current.abbr)
+  cmd = current.tmux_cmd("attach -t #{current.abbr}")
+  puts "> #{cmd}" if DEBUG
+  exec cmd
+  # ^ replaces process, so execution stops there
+end
+
+# start building up a new tmux session
 Dir.chdir File.expand_path(current.dir)
-system "tmux new -s #{current.abbr} -d"
+run current.tmux_cmd("new -s #{current.abbr} -d")
 delayed = []
 1.step(to: current.windows) do |n|
   cmd, label = current.commands[n - 1], current.labels[n - 1]
-  system "tmux new-window -t #{current.abbr}" unless n == 1
+  run current.tmux_cmd("new-window -t #{current.abbr}") unless n == 1
   if cmd
-    tmux_command = ["tmux", "send-keys", "-t", "#{current.abbr}:#{n}", cmd]
-    tmux_command << "Enter" if cmd && current.start
-    delayed << tmux_command
+    tmux_cmd_parts = [
+      "send-keys",
+      "-t",
+      "#{current.abbr}:#{n}",
+      keys_escape(cmd),
+    ]
+    tmux_cmd_parts << "Enter" if cmd && current.start
+    full_tmux_cmd = current.tmux_cmd(*tmux_cmd_parts)
+    puts "DELAYED$ #{full_tmux_cmd}" if DEBUG
+    delayed << full_tmux_cmd
   end
   if label
-    system "tmux", "rename-window", "-t", "#{current.abbr}:#{n}", label
+    run current.tmux_cmd("rename-window -t #{current.abbr}:#{n}", label)
   end
 end
 
@@ -113,5 +165,7 @@ if delayed.any?
   delayed.each { |cmd| system(*cmd) }
 end
 
-system "tmux select-window -t #{current.abbr}:1"
-exec "tmux attach -t #{current.abbr}" unless ARGV[1] =~ /silent/
+# move back to first window in case we aren't there anymore
+run current.tmux_cmd("select-window -t #{current.abbr}:1")
+# finally, attach to the new session
+exec current.tmux_cmd("attach -t #{current.abbr}")
