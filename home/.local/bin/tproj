@@ -2,6 +2,8 @@
 
 require "yaml"
 require "open3"
+require "optparse"
+require "pry"
 
 # Usage:
 # tproj <- get a list of available projects (configured below)
@@ -11,10 +13,17 @@ require "open3"
 DEBUG = false
 
 class Project
+  OVERWRITEABLE = %w[dir windows start distrobox]
   attr_reader :options
 
   def initialize(options)
     @options  = options
+  end
+
+  def apply(other_options)
+    OVERWRITEABLE.each do |key|
+      options[key] = other_options[key] if other_options.key?(key)
+    end
   end
 
   def dir
@@ -61,6 +70,37 @@ class Project
   end
 end
 
+def parse_options(argv)
+  options = {}
+  args = OptionParser.new do |op|
+    op.banner = "Usage: tproj [options] [project_name] [dir]"
+
+    op.on("-a ABBR", "--abbr ABBR", "Abbreviation for project. Used as tmux session name.") do |abbr|
+      options["abbr"] = abbr
+    end
+    op.on("-d DIR", "--dir DIR", "Project working directory") do |dir|
+      options["dir"] = dir
+    end
+    op.on("-w WINDOWS", "--windows WINDOWS", Integer, "Number of tmux windows in project") do |windows|
+      options["windows"] = [windows, 1].max
+    end
+    op.on("--[no-]start", "Overrides project start option for pre-filled commands") do |start|
+      options["start"] = start
+    end
+    op.on("-x [DISTROBOX]", "--distrobox [DISTROBOX]", "Create tmux session within specified distrobox. If blank, run on host (no distrobox).") do |distrobox|
+      options["distrobox"] = distrobox
+    end
+    op.on("-h", "--help") do
+      puts op
+      puts example_usage
+      exit
+    end
+  end.parse(argv)
+  options["abbr"] = args.shift if args.any? && !options["abbr"]
+  options["dir"] = args.shift if args.any? && !options["dir"]
+  options
+end
+
 def default_config_path
   File.expand_path("~/.config/tproj.yml")
 end
@@ -98,17 +138,26 @@ def find_existing_sessions(proj)
   stdout.split("\n").map {|line| line.split(":").first }
 end
 
+def example_usage
+  puts <<~HELPTEXT
+    Examples:
+
+      $ tproj project-name
+      $ tproj abbr path/to/project
+      $ tproj --distrobox=arch-asdf my-project --windows=5
+      $ tproj --abbr=acab --dir=projects/police-brutality --windows=2
+
+    Pre-configured projects: #{projects.map(&:abbr).join(', ')}
+  HELPTEXT
+end
+
 def find_current_project(abbr = nil, window = nil, *others)
   # if user specifies both abbr and window, assume we want a new project
   return create_project(abbr, window, *others) if abbr && window
   # if just an abbreviation, look it up
   return find_project(abbr) if abbr
   # otherwise, print out usage
-  names = projects.map(&:abbr).join(", ")
-  puts "Example: tproj project-name"
-  puts "Example: tproj abbr dir [windows=1]"
-  puts "Available projects: #{names}"
-  exit
+  example_usage
 end
 
 def set_terminal_title(title)
@@ -126,7 +175,13 @@ def keys_escape(cmd)
   cmd.gsub(/\s+/, ' Space ')
 end
 
-current = find_current_project(*ARGV)
+options = parse_options(ARGV)
+
+project = find_project(options["abbr"])
+project.apply(options) if project
+
+current = project || Project.new(options)
+
 set_terminal_title("tmux: #{current.names.first}")
 
 if find_existing_sessions(current).member?(current.abbr)
