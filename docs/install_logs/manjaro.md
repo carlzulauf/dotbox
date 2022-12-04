@@ -4,12 +4,6 @@ Flatpaks easy to switch on through Pamac preferences.
 
 OMG. None of the default gnome shortcuts work. Why would I want Super+Number to switch to a bunch of different workspaces? I maybe use 1/2, 3 at most and I know the left/right shortcut. Luckily that works. Super+Up also doesn't work.
 
-The folks over at Manjaro seem to operate a most unhelpful forum. A couple questions opened about getting these back and both closed without anything approaching a solution to the Super shortcuts.
-
-Removing `manjaro-gnome-extension-settings` was supposed to fix it. It did not.
-
-I'm so far down this rabbit hole now and I'm determined to understand what's going on and notate it because this has happened before and I'm sick of having no solution to deep gnome config issues like this.
-
 I think we have to look around here: `/usr/share/glib-2.0/schemas`
 
 Ok, so, it looks like `gnome-shell` has global (xml) settings with the correct keybindings but for some reason the gsettings database says different. No amount of removing packages will solve that. The settings for `switch-to-application` are cleared out:
@@ -54,7 +48,7 @@ $ gsettings set org.gnome.shell.keybindings switch-to-application-9 "['<Super>9'
 => [true, true, true, true, true, true, true, true, true]
 ```
 
-Foudn some more conflicting keybindings here, which I cleared out:
+Found some more conflicting keybindings here, which I cleared out:
 
 ```
 gsettings list-recursively org.gnome.desktop.wm.keybindings
@@ -63,7 +57,14 @@ gsettings set org.gnome.desktop.wm.keybindings switch-to-workspace-6 "[]"
 ...
 ```
 
-I guess we can add back the stuff we removed since it didn't make a difference. Getting back to stock Manjaro with those gsettings applied.
+[This answer](https://forum.manjaro.org/t/super-number-shortcut-dont-work/117651/2) points to using dconf editor to edit hidden keybindings in the following locations. I didn't understand the answer at the time but it's ultimately very helpful.
+
+```
+/org/gnome/shell/keybindings/
+/org/gnome/desktop/wm/keybindings/
+/org/gnome/shell/extensions/dash-to-dock/
+/org/gnome/shell/extensions/materialshell/
+```
 
 We can install the dot files now and some essentials.
 
