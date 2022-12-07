@@ -1,0 +1,18 @@
+#!/usr/bin/env ruby
+
+require "pathname"
+
+
+# It can be difficult to find all the *.desktop files installed.
+# This script lists them out for you along with their location.
+
+ENV["XDG_DATA_DIRS"].split(":").each do |dir|
+  path = Pathname.new(dir).join("applications")
+  desktops = path.glob("**/*.desktop")
+  if desktops.any?
+    puts
+    puts path
+    puts
+    puts desktops.map{|d| " - #{d.relative_path_from(path)}"}
+  end
+end
