@@ -3,7 +3,6 @@
 require "yaml"
 require "open3"
 require "optparse"
-require "pry"
 
 # Usage:
 # tproj <- get a list of available projects (configured below)
