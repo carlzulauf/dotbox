@@ -1,0 +1,11 @@
+port <%= port %>
+
+dir <%= dir %>
+pidfile <%= dir %>/<%= port %>.pid
+
+loglevel notice
+# empty string is stdout
+logfile ""
+
+databases 16
+dbfilename <%= project %>.rdb

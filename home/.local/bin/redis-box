@@ -1,0 +1,92 @@
+#!/usr/bin/env ruby
+
+require "optparse"
+require "erb"
+
+DEFAULT_DATA_DIR = "~/.local/share/redis"
+DEFAULT_CONFIG_PATH = "~/projects/dotbox/docs/templates/redis-box.conf.erb"
+
+class Script < Struct.new(:options)
+  def self.parse_options(argv)
+    options = {
+      project: "default",
+      port: 6379,
+      dir: File.expand_path(DEFAULT_DATA_DIR),
+      template: File.expand_path(DEFAULT_CONFIG_PATH),
+      force: false,
+    }
+
+    args = OptionParser.new do |op|
+      op.banner = "Usage: redis-box [options]"
+
+      op.on("-x DISTROBOX", "--distrobox DISTROBOX", "Specify existing distrobox to use. Must have redis installed.") do |distrobox|
+        options[:distrobox] = distrobox
+      end
+
+      op.on("-d DIR", "--dir DIR", "Redis working directory. Default is #{DEFAULT_DATA_DIR}") do |dir|
+        options[:dir] = File.expand_path(dir)
+      end
+
+      op.on("-t TEMPLATE", "--template TEMPLATE", "Path to redis config ERB template. Defaults to #{DEFAULT_CONFIG_PATH}") do |path|
+        options[:template] = File.expand_path(path)
+      end
+
+      op.on("-p PORT", "--port PORT", Integer, "Port to listen on. Default: #{options[:port]}") do |port|
+        options[:port] = port
+      end
+
+      op.on("-n PROJECT", "--project PROJECT", "Name of project. Corresponds to rdb file name. Default is 'default'.") do |project|
+        options[:project] = project
+      end
+
+      op.on("-f", "--force", "Force generation of config file for project, even if one already exists.") do
+        options[:force] = true
+      end
+
+      op.on("-h", "--help") do
+        puts op
+        exit
+      end
+    end.parse(argv)
+
+    options[:project] = args.first if args.first
+
+    self.new options
+  end
+
+  def call
+    find_create_distrobox unless options[:distrobox]
+
+    FileUtils.mkpath(options[:dir]) unless File.exist?(options[:dir])
+    conf_path = File.join(options[:dir], "#{options[:project]}.conf")
+    File.write(conf_path, render_conf) if !File.exist?(conf_path) || options[:force]
+    cmd = "distrobox enter #{options[:distrobox]} -- redis-server #{conf_path}"
+
+    puts "Running redis-server on distrobox '#{options[:distrobox]}':"
+    puts "$ #{cmd}"
+
+    exec cmd
+  end
+
+  def render_conf
+    port, dir, project = options.values_at(:port, :dir, :project)
+    ERB.new(File.read(options[:template])).result(binding)
+  end
+
+  def find_create_distrobox
+    list = `distrobox list --no-color`.lines.map{|l| l.split("|").map(&:strip) }
+    existing_boxes = list[1..].map { |box| list[0].zip(box).to_h }
+
+    if existing_boxes.none? { |box| box["NAME"] == "redis" }
+      puts "Creating distrobox from docker.io/redis container"
+      cmd = "distrobox create --image docker.io/redis --name redis --pull"
+
+      puts "$ #{cmd}"
+      system cmd
+    end
+
+    options[:distrobox] = "redis"
+  end
+end
+
+Script.parse_options(ARGV).()
