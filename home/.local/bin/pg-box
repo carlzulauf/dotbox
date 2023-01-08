@@ -1,0 +1,81 @@
+#!/usr/bin/env ruby
+
+require "optparse"
+require "open3"
+
+DEFAULT_DIR = "~/.local/share/postgres"
+
+# initdb --locale en_US.UTF-8 -D ~/.local/share/postgres/data
+# postgresql-check-db-dir ~/.local/share/postgres/data
+# postgres -D ~/.local/share/postgres/data -k ~/.local/share/postgres
+
+class Script < Struct.new(:options)
+  def self.parse_options(argv)
+    options = {
+      dir: File.expand_path(DEFAULT_DIR),
+      init: true,
+    }
+
+    args = OptionParser.new do |op|
+      op.banner = "Usage: pg-box [options]"
+
+      op.on("-x DISTROBOX", "--distrobox DISTROBOX", "Specify existing distrobox to use. Must have postgres installed.") do |distrobox|
+        options[:distrobox] = distrobox
+      end
+
+      op.on("-d DIR", "--dir DIR", "Postgres working+data dir. Default is #{DEFAULT_DIR}") do |dir|
+        options[:dir] = File.expand_path(dir)
+      end
+
+      op.on("--no-init", "Don't try to initialize if db dir check fails") do
+        options[:init] = false
+      end
+
+      op.on("-h", "--help") do
+        puts op
+        exit
+      end
+    end.parse(argv)
+
+    self.new options
+  end
+
+  def call
+    find_or_create_postgres_box unless options[:distrobox]
+
+    FileUtils.mkpath(options[:dir]) unless File.exist?(options[:dir])
+
+    init_data_dir if options[:init] && !data_dir_initialized?
+
+    puts "Running postgres on distrobox '#{options[:distrobox]}'"
+    cmd = dbx_exec("postgres -D #{data_dir} -k #{options[:dir]}")
+    puts "$ #{cmd}"
+    exec cmd
+  end
+
+  def data_dir
+    File.join(options[:dir], "data")
+  end
+
+  def dbx_exec(cmd)
+    "distrobox enter #{options[:distrobox]} -- #{cmd}"
+  end
+
+  def data_dir_initialized?
+    # postgresql-check-db-dir ~/.local/share/postgres/data
+    cmd = dbx_exec("postgresql-check-db-dir #{data_dir}")
+    puts "$ #{cmd}"
+    _out, status = Open3.capture2e(cmd)
+    status.success?
+  end
+
+  def init_data_dir
+    raise "init_data_dir not implemented"
+  end
+
+  def find_or_create_postgres_box
+    raise "find_or_create_postgres_box not implemented"
+  end
+end
+
+Script.parse_options(ARGV).()
