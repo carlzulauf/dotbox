@@ -69,7 +69,7 @@ gsettings set org.gnome.desktop.wm.keybindings switch-to-workspace-6 "[]"
 We can install the dot files now and some essentials.
 
 ```
-sudo pacman -S fish exa starship tmux direnv neofetch bind sysstat ruby ruby-pry ruby-webrick ruby-docs ttf-ubuntumono-nerd
+sudo pacman -S fish exa starship tmux direnv neofetch bind sysstat ruby ruby-pry ruby-webrick ruby-docs ttf-ubuntumono-nerd imagewriter lbzip2
 ```
 
 Then used `chsh` to change to fish.
@@ -101,7 +101,9 @@ sudo usermod --add-subuids 100000-199999 --add-subgids 100000-199999 carl
 podman system migrate
 distrobox create -i archlinux arch-shell
 distrobox enter arch-shell
-as:$ sudo pacman -S which neofetch sysstat smartmontools iotop bind nano ruby ruby ruby-pry ruby-docs starship git man-db
+as:$ sudo pacman -S which neofetch sysstat smartmontools iotop bind nano ruby ruby ruby-pry ruby-docs starship exa git man-db base-devel openssh
+as:$ cd ~/projects/0wnloads/yay
+as:$ makepkg -si
 ```
 
 Everything is working. Not sure where services should live. Maybe I should take the most space efficient approach? Starting with redis, here are some options I see:
@@ -149,9 +151,6 @@ Trying to get a real fully working example of using asdf via distrobox to run my
 ```
 distrobox create --clone arch-shell arch-asdf
 distrobox enter arch-asdf
-aa:$ sudo pacman -Syu base-devel
-aa:$ cd ~/projects/0wnloads/yay
-aa:$ makepkg -si
 aa:$ yay -S asdf-vm
 aa:$ exit
 # need to re-enter distrobox for asdf to be in path
@@ -176,6 +175,20 @@ Now we install the ruby and javascript requirements for the app.
 ```
 yarn install
 bundle install
+```
+
+## home dir dbs via distrobox
+
+Starting with the arch environment I like, then adding redis/postgres/mysql in a single distrobox to run on demand and store data in ~/.local/share.
+
+```
+distrobox create --clone arch-shell arch-dbs
+distrobox enter arch-dbs
+ad:$ sudo pacman -Syu postgresql redis
+ad:$ sudo nano /etc/locale.gen # uncomment "en_US.UTF-8 UTF-8" line
+ad:$ sudo locale-gen en_US.UTF-8
+ad:$ initdb --locale en_US.UTF-8 -D ~/.local/share/postgres/data
+
 ```
 
 ## Additional Storage
