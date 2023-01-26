@@ -4,19 +4,31 @@
 #
 # A container that manages containers. Amazing.
 
+# SSH into dokku container: ssh -p 3022 dokku@dokku.localdev
+
 require 'pry'
 require "json"
+require "open3"
 
-def r(*cmd)
-  puts "$ #{cmd.join(' ')}"
-  system cmd.join(' ')
+def r(*cmd, capture: false)
+  cmd = cmd.join(' ')
+  log "$ #{cmd}"
+  return system(cmd) unless capture
+
+  out, err, status = Open3.capture3(cmd)
+  log "ERROR -> #{err}" unless err.empty?
+  out
+end
+
+def log(msg)
+  puts "[#{Time.now.strftime('%Y-%m-%d %H:%M:%S')}] #{msg}"
 end
 
 # user = ENV["USER"]
 uid = Process.uid
 local_files = File.expand_path("~/.local/dokku")
 
-version = "0.28.4"
+version = "0.29.4"
 
 # should be able to replace these with docker details
 imager = "podman"
@@ -41,7 +53,9 @@ run_options = <<~PODMANOPTIONS.lines(chomp: true)
 PODMANOPTIONS
 
 images = JSON.parse(`podman images --format json`)
-if images.none? { |i| i["Names"].member?(image_name) }
+if images.any? { |i| i["Names"].member?(image_name) }
+  log "Existing dokku image found"
+else
   r "podman pull #{image_name}"
 end
 
@@ -54,6 +68,6 @@ end
 
 r "podman exec -it -w /root dokku bash"
 
-puts "dokku bash exited, stopping container"
+log "dokku bash exited, stopping container"
 
 r "podman container stop dokku"
