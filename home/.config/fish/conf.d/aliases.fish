@@ -17,14 +17,30 @@ else
 end
 
 # flatpak shortcuts
-
 if test -d ~/.var/app/com.visualstudio.code-oss/data/
-  alias code='flatpak run com.visualstudio.code-oss'
-  alias codo='flatpak run com.visualstudio.code-oss'
+  if type -q flatpak
+    alias code='flatpak run com.visualstudio.code-oss'
+    alias codo='flatpak run com.visualstudio.code-oss'
+  else
+    # No flatpak, but host-exec. Assume we're in a distrobox.
+    if type -q distrobox-host-exec
+      alias code='distrobox-host-exec flatpak run com.visualstudio.code-oss'
+      alias codo='distrobox-host-exec flatpak run com.visualstudio.code-oss'
+    end
+  end
 end
 
 if test -d ~/.var/app/com.visualstudio.code/data/
-  alias code='flatpak run com.visualstudio.code'
-  alias vscode='flatpak run com.visualstudio.code'
-  alias vsc='flatpak run com.visualstudio.code'
+  if type -q flatpak
+    alias code='flatpak run com.visualstudio.code'
+    alias vscode='flatpak run com.visualstudio.code'
+    alias vsc='flatpak run com.visualstudio.code'
+  else
+    # No flatpak, but host-exec. Assume we're in a distrobox.
+    if type -q distrobox-host-exec
+      alias code='distrobox-host-exec flatpak run com.visualstudio.code'
+      alias vscode='distrobox-host-exec flatpak run com.visualstudio.code'
+      alias vsc='distrobox-host-exec flatpak run com.visualstudio.code'
+    end
+  end
 end
