@@ -92,7 +92,6 @@ def parse_options(argv)
     op.on("-h", "--help") do
       puts op
       puts example_usage
-      exit
     end
   end.parse(argv)
   options["abbr"] = args.shift if args.any? && !options["abbr"]
@@ -126,7 +125,7 @@ def find_project(name)
   projects.each do |project|
     return project if project.names.member?(name)
   end
-  fatal_error "Project not found: #{ARGV[0].inspect}"
+  nil
 end
 
 def find_existing_sessions(proj)
@@ -143,20 +142,25 @@ def example_usage
 
       $ tproj project-name
       $ tproj abbr path/to/project
-      $ tproj --distrobox=arch-asdf my-project --windows=5
+      $ tproj --distrobox=arch-asdf --windows=5 my-project
       $ tproj --abbr=acab --dir=projects/police-brutality --windows=2
 
     Pre-configured projects: #{projects.map(&:abbr).join(', ')}
   HELPTEXT
+  exit
 end
 
-def find_current_project(abbr = nil, window = nil, *others)
-  # if user specifies both abbr and window, assume we want a new project
-  return create_project(abbr, window, *others) if abbr && window
-  # if just an abbreviation, look it up
-  return find_project(abbr) if abbr
-  # otherwise, print out usage
-  example_usage
+def find_or_create_project(options)
+  return unless options["abbr"]
+
+  # see if it already exists
+  project = find_project(options["abbr"])
+  return project if project
+
+  # if we have any of these options besides just abbr
+  if %w[dir distrobox windows].any? { |key| options[key] }
+    Project.new(options)
+  end
 end
 
 def set_terminal_title(title)
@@ -176,10 +180,9 @@ end
 
 options = parse_options(ARGV)
 
-project = find_project(options["abbr"])
-project.apply(options) if project
-
-current = project || Project.new(options)
+current = find_or_create_project(options)
+example_usage unless current
+current.apply(options)
 
 set_terminal_title("tmux: #{current.names.first}")
 
