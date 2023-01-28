@@ -16,31 +16,38 @@ else
   # ls aliases here
 end
 
-# flatpak shortcuts
-if test -d ~/.var/app/com.visualstudio.code-oss/data/
-  if type -q flatpak
-    alias code='flatpak run com.visualstudio.code-oss'
-    alias codo='flatpak run com.visualstudio.code-oss'
-  else
-    # No flatpak, but host-exec. Assume we're in a distrobox.
-    if type -q distrobox-host-exec
+if test -e /run/.containerenv; or test -e /.dockerenv
+  # we're inside of a container/distrobox
+  if test -d ~/.var/app/com.visualstudio.code-oss/data/; or test -d ~/.var/app/com.visualstudio.code/data/
+    if test -d ~/.var/app/com.visualstudio.code-oss/data/
       alias code='distrobox-host-exec flatpak run com.visualstudio.code-oss'
       alias codo='distrobox-host-exec flatpak run com.visualstudio.code-oss'
     end
-  end
-end
 
-if test -d ~/.var/app/com.visualstudio.code/data/
-  if type -q flatpak
-    alias code='flatpak run com.visualstudio.code'
-    alias vscode='flatpak run com.visualstudio.code'
-    alias vsc='flatpak run com.visualstudio.code'
-  else
-    # No flatpak, but host-exec. Assume we're in a distrobox.
-    if type -q distrobox-host-exec
+    if test -d ~/.var/app/com.visualstudio.code/data/
       alias code='distrobox-host-exec flatpak run com.visualstudio.code'
       alias vscode='distrobox-host-exec flatpak run com.visualstudio.code'
       alias vsc='distrobox-host-exec flatpak run com.visualstudio.code'
     end
+  else
+    alias code='distrobox-host-exec code'
+    alias codo='distrobox-host-exec code'
+  end
+else
+  # we're not inside of a container (on host OS)
+  if test -d ~/.var/app/com.visualstudio.code-oss/data/; or test -d ~/.var/app/com.visualstudio.code/data/
+    if test -d ~/.var/app/com.visualstudio.code-oss/data/
+      alias code='flatpak run com.visualstudio.code-oss'
+      alias codo='flatpak run com.visualstudio.code-oss'
+    end
+
+    if test -d ~/.var/app/com.visualstudio.code/data/
+      alias code='flatpak run com.visualstudio.code'
+      alias vscode='flatpak run com.visualstudio.code'
+      alias vsc='flatpak run com.visualstudio.code'
+    end
+  else
+    # assume we have natively installed code/vscode
+    # no need for additional aliases in this case
   end
 end
