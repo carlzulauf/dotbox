@@ -34,7 +34,7 @@ class Project
   end
 
   def names
-    options.fetch("names") { [abbr] }
+    [abbr, *options.fetch("names", [])].uniq
   end
 
   def windows
