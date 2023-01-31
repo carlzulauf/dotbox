@@ -43,3 +43,28 @@ distrobox create -i archlinux arch-shell
 distrobox enter arch-shell
 as:$ sudo pacman -S base-devel which neofetch sysstat smartmontools iotop bind nano ruby ruby-pry ruby-docs starship git man-db
 ```
+
+Now that we have a base distrobox with a reasonable arch shell environment, clone it to create one dedicated to asdf.
+
+```
+distrobox stop arch-shell
+distrobox create --clone arch-shell arch-asdf
+distrobox enter arch-asdf
+aa:$ yay -S asdf-vm
+```
+
+Exit distrobox and re-enter to complete asdf setup.
+
+```
+asdf plugin add ruby
+asdf install ruby 3.1.2
+asdf local ruby 3.1.2
+asdf plugin add nodejs
+asdf install nodejs 16.14.0
+asdf local nodejs 16.14.0
+asdf plugin add yarn
+asdf install yarn latest
+asdf local yarn latest
+```
+
+Exit and re-enter again and asdf will power ruby/node/etc.
