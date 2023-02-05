@@ -41,7 +41,7 @@ podman system migrate
 curl -s https://raw.githubusercontent.com/89luca89/distrobox/main/install | sh -s -- --prefix ~/.local
 distrobox create -i archlinux arch-shell
 distrobox enter arch-shell
-as:$ sudo pacman -S base-devel which neofetch sysstat smartmontools iotop bind nano ruby ruby-pry ruby-docs starship git man-db
+as:$ sudo pacman -S base-devel openssh tmux direnv which neofetch sysstat smartmontools iotop bind nano ruby ruby-pry ruby-docs git man-db
 ```
 
 Now that we have a base distrobox with a reasonable arch shell environment, clone it to create one dedicated to asdf.
