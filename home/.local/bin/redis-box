@@ -2,6 +2,7 @@
 
 require "optparse"
 require "erb"
+require "fileutils"
 
 DEFAULT_DATA_DIR = "~/.local/share/redis"
 DEFAULT_CONFIG_PATH = "~/projects/dotbox/docs/templates/redis-box.conf.erb"
