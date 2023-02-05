@@ -59,6 +59,10 @@ def tp(table, headers: nil, enclosed: true)
   nil
 end
 
+def read_utf16
+  JSON.parse(%|"#{STDIN.gets(chomp: true)}"|)
+end
+
 def opassword_items
   @opassword_items ||= JSON.parse(`op list items`)
 end
