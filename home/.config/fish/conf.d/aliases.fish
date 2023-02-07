@@ -1,8 +1,15 @@
 alias bex='bundle exec'
 alias ber='bex rspec'
-alias dc='docker-compose'
 alias fix_keychron='echo 0 | sudo tee /sys/module/hid_apple/parameters/fnmode'
 alias strip_colors='sed \'s/\x1B\[[0-9;]\{1,\}[A-Za-z]//g\''
+
+if type -q docker-compose
+  alias dc='docker-compose'
+else
+  if type -q podman-compose
+    alias dc='podman-compose'
+  end
+end
 
 # Replace ls with exa if available
 if type -q exa
@@ -18,6 +25,7 @@ end
 
 if test -e /run/.containerenv; or test -e /.dockerenv
   # we're inside of a container/distrobox
+  alias dc='distrobox-host-exec podman-compose'
   if test -d ~/.var/app/com.visualstudio.code-oss/data/; or test -d ~/.var/app/com.visualstudio.code/data/
     if test -d ~/.var/app/com.visualstudio.code-oss/data/
       alias code='distrobox-host-exec flatpak run com.visualstudio.code-oss'
