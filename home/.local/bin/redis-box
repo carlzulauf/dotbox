@@ -18,7 +18,7 @@ class Script < Struct.new(:options)
     }
 
     args = OptionParser.new do |op|
-      op.banner = "Usage: redis-box [options]"
+      op.banner = "Usage: redis-box [options] [project]"
 
       op.on("-x DISTROBOX", "--distrobox DISTROBOX", "Specify existing distrobox to use. Must have redis installed.") do |distrobox|
         options[:distrobox] = distrobox
