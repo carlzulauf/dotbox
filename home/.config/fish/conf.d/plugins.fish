@@ -9,7 +9,7 @@ if status --is-interactive
 
   else # otherwise, look in fish_prompt.fish which uses terlar prompt by default
 
-    if test -f ~/.config/fish/fish_prompt.fish
+    if test -f ~/.config/fish/fish_prompt.fish; and type -q prompt_login
       source ~/.config/fish/fish_prompt.fish
     end
 
