@@ -9,7 +9,7 @@ require "optparse"
 # tproj project-name <- start or resume a specific project
 
 # looks in ~/.config/tproj.conf for project configs
-DEBUG = false
+@debug = false
 
 class Project
   OVERWRITEABLE = %w[dir windows start distrobox]
@@ -26,7 +26,7 @@ class Project
   end
 
   def dir
-    options.fetch("dir") { Dir.pwd }
+    File.expand_path(options.fetch("dir") { Dir.pwd })
   end
 
   def abbr
@@ -57,15 +57,16 @@ class Project
     options.fetch("start") { false }
   end
 
+  def attach?
+    !options["detach"]
+  end
+
   def tmux_cmd(*args)
     box = options["distrobox"]
-    base = if box
-      "distrobox-enter #{box} -- tmux -S ~/.local/share/tmux-#{box}.sock"
-    else
-      "tmux"
-    end
-    return base unless args.any?
-    [base, *args].join(" ")
+    return ["tmux", *args].join(" ") unless box
+
+    tmux_parts = ["tmux -S ~/.local/share/tmux-#{box}.sock", *args].join(" ")
+    "distrobox-enter #{box} -- #{tmux_parts}"
   end
 end
 
@@ -88,6 +89,9 @@ def parse_options(argv)
     end
     op.on("-x [DISTROBOX]", "--distrobox [DISTROBOX]", "Create tmux session within specified distrobox. If blank, run on host (no distrobox).") do |distrobox|
       options["distrobox"] = distrobox
+    end
+    op.on("--detach", "Do not attach to the created tmux session") do
+      options["detach"] = true
     end
     op.on("-h", "--help") do
       puts op
@@ -130,7 +134,7 @@ end
 
 def find_existing_sessions(proj)
   cmd = proj.tmux_cmd("list-sessions")
-  puts "$ #{cmd}" if DEBUG
+  puts "$ #{cmd}" if @debug
   stdout, _stderr, status = Open3.capture3(cmd)
   return [] if !status.success?
   stdout.split("\n").map {|line| line.split(":").first }
@@ -168,14 +172,14 @@ def set_terminal_title(title)
 end
 
 def run(cmd)
-  puts "$ #{cmd}" if DEBUG
+  puts "$ #{cmd}" if @debug
   system cmd
 end
 
 # Convert a command into a set of tmux send-keys values
 def keys_escape(cmd)
-  # convert 'word1 word2' to 'word1 Space word2'
-  cmd.gsub(/\s+/, ' Space ')
+  # encapsulate in quotes and quote existing quotes
+  cmd.inspect
 end
 
 options = parse_options(ARGV)
@@ -188,18 +192,17 @@ set_terminal_title("tmux: #{current.names.first}")
 
 if find_existing_sessions(current).member?(current.abbr)
   cmd = current.tmux_cmd("attach -t #{current.abbr}")
-  puts "> #{cmd}" if DEBUG
+  puts "> #{cmd}" if @debug
   exec cmd
   # ^ replaces process, so execution stops there
 end
 
 # start building up a new tmux session
-Dir.chdir File.expand_path(current.dir)
-run current.tmux_cmd("new -s #{current.abbr} -d")
+run current.tmux_cmd("new -s #{current.abbr} -c #{current.dir} -d")
 delayed = []
 1.step(to: current.windows) do |n|
   cmd, label = current.commands[n - 1], current.labels[n - 1]
-  run current.tmux_cmd("new-window -t #{current.abbr}") unless n == 1
+  run current.tmux_cmd("new-window -t #{current.abbr} -c #{current.dir}") unless n == 1
   if cmd
     tmux_cmd_parts = [
       "send-keys",
@@ -209,7 +212,7 @@ delayed = []
     ]
     tmux_cmd_parts << "Enter" if cmd && current.start
     full_tmux_cmd = current.tmux_cmd(*tmux_cmd_parts)
-    puts "DELAYED$ #{full_tmux_cmd}" if DEBUG
+    puts "DELAYED$ #{full_tmux_cmd}" if @debug
     delayed << full_tmux_cmd
   end
   if label
@@ -225,4 +228,4 @@ end
 # move back to first window in case we aren't there anymore
 run current.tmux_cmd("select-window -t #{current.abbr}:1")
 # finally, attach to the new session
-exec current.tmux_cmd("attach -t #{current.abbr}")
+exec current.tmux_cmd("attach -t #{current.abbr}") unless current.attach?
