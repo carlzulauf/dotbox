@@ -41,6 +41,9 @@ if test -e /run/.containerenv; or test -e /.dockerenv
     alias code='distrobox-host-exec code'
     alias codo='distrobox-host-exec code'
   end
+  if test -d ~/.var/app/dev.pulsar_edit.Pulsar
+    alias puls='distrobox-host-exec flatpak run dev.pulsar_edit.Pulsar'
+  end
 else
   # we're not inside of a container (on host OS)
   if test -d ~/.var/app/com.visualstudio.code-oss/data/; or test -d ~/.var/app/com.visualstudio.code/data/
@@ -57,5 +60,8 @@ else
   else
     # assume we have natively installed code/vscode
     # no need for additional aliases in this case
+  end
+  if test -d ~/.var/app/dev.pulsar_edit.Pulsar
+    alias puls='flatpak run dev.pulsar_edit.Pulsar'
   end
 end
