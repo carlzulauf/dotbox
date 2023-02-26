@@ -228,4 +228,4 @@ end
 # move back to first window in case we aren't there anymore
 run current.tmux_cmd("select-window -t #{current.abbr}:1")
 # finally, attach to the new session
-exec current.tmux_cmd("attach -t #{current.abbr}") unless current.attach?
+exec current.tmux_cmd("attach -t #{current.abbr}") if current.attach?
