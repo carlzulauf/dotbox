@@ -9,10 +9,10 @@ require "optparse"
 # tproj project-name <- start or resume a specific project
 
 # looks in ~/.config/tproj.conf for project configs
-@debug = false
+@debug = true
 
 class Project
-  OVERWRITEABLE = %w[dir windows start distrobox]
+  OVERWRITEABLE = %w[dir windows start distrobox detach]
   attr_reader :options
 
   def initialize(options)
@@ -228,4 +228,8 @@ end
 # move back to first window in case we aren't there anymore
 run current.tmux_cmd("select-window -t #{current.abbr}:1")
 # finally, attach to the new session
-exec current.tmux_cmd("attach -t #{current.abbr}") if current.attach?
+if current.attach?
+  cmd = current.tmux_cmd("attach -t #{current.abbr}")
+  puts "$ #{cmd}" if @debug
+  exec cmd
+end
