@@ -136,8 +136,12 @@ def find_existing_sessions(proj)
   cmd = proj.tmux_cmd("list-sessions")
   puts "$ #{cmd}" if @debug
   stdout, _stderr, status = Open3.capture3(cmd)
-  return [] if !status.success?
-  stdout.split("\n").map {|line| line.split(":").first }
+  if status.success?
+    stdout.split("\n").map {|line| line.split(":").first }
+  else
+    puts "Error: #{_stderr}"
+    []
+  end
 end
 
 def example_usage
@@ -230,6 +234,6 @@ run current.tmux_cmd("select-window -t #{current.abbr}:1")
 # finally, attach to the new session
 if current.attach?
   cmd = current.tmux_cmd("attach -t #{current.abbr}")
-  puts "$ #{cmd}" if @debug
+  puts "> #{cmd}" if @debug
   exec cmd
 end
