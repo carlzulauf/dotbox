@@ -23,6 +23,11 @@ else
   # ls aliases here
 end
 
+if type -q distrobox
+  alias de="distrobox enter"
+  alias dbx=distrobox
+end
+
 if test -e /run/.containerenv; or test -e /.dockerenv
   # we're inside of a container/distrobox
   alias dc='distrobox-host-exec podman-compose'
