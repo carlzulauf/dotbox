@@ -1,0 +1,72 @@
+#!/usr/bin/env ruby
+
+require 'optparse'
+
+# list any configured ssh hosts
+
+SSH_DIR = File.expand_path("~/.ssh")
+
+class Script < Struct.new(:options)
+  def self.parse_options(argv)
+    options = {
+      verbose: false,
+      dir: SSH_DIR,
+    }
+
+    args = OptionParser.new do |op|
+      op.banner = "Usage: sshls [options]"
+
+      op.on("-d DIR", "--dir DIR", "SSH config directory to look in") do |dir|
+        options[:dir] = File.expand_path(dir)
+      end
+
+      op.on("-v", "--verbose", "Show full configuration of each host") do
+        options[:verbose] = true
+      end
+
+      op.on("-h", "--help") do
+        puts op
+        exit
+      end
+    end.parse(argv)
+
+    self.new options
+  end
+
+  def call
+    find_configs.each do |config_path|
+      puts nil, "#{config_path} :", nil
+      if options[:verbose]
+        puts File.read(config_path)
+      else
+        print_host_lines(config_path)
+      end
+    end
+  end
+
+  def print_host_lines(path)
+    File.readlines(path, chomp: true).each do |line|
+      host = line.match(/^Host (?<name>.+)$/)
+      puts " * #{host[:name]}" if host
+    end
+  end
+
+  def find_configs
+    to_search = [File.join(options[:dir], "config")]
+    configs = []
+
+    loop do
+      config = to_search.pop
+      configs << config
+      File.readlines(config, chomp: true).each do |line|
+        load = line.match(/^Include (?<path>.+)$/)
+        to_search << File.expand_path(load[:path]) if load
+      end
+      break if to_search.empty?
+    end
+
+    configs
+  end
+end
+
+Script.parse_options(ARGV).()
