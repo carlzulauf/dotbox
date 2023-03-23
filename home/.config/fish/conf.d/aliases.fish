@@ -3,11 +3,11 @@ alias ber='bex rspec'
 alias fix_keychron='echo 0 | sudo tee /sys/module/hid_apple/parameters/fnmode'
 alias strip_colors='sed \'s/\x1B\[[0-9;]\{1,\}[A-Za-z]//g\''
 
-if type -q docker-compose
-  alias dc='docker-compose'
+if type -q podman-compose
+  alias dc='podman-compose'
 else
-  if type -q podman-compose
-    alias dc='podman-compose'
+  if type -q docker-compose
+    alias dc='docker-compose'
   end
 end
 
