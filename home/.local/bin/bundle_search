@@ -1,0 +1,204 @@
+#!/usr/bin/env ruby
+
+require "optparse"
+
+# Usage:
+# bundle_search "accounts.yml" <- Find all files containing the string "accounts.yml"
+# bundle_search -n "accounts.yml" <- Find files with names containing the string "accounts.yml"
+# bundle_search /accounts\.yml/i <- Find files containing lines matching regular expression
+
+MAX_FILE_SIZE = 16 * 1024 * 1024 # 16MB. Don't search files bigger than this.
+
+# we don't need to use `file` to check for text files if these extensions are used
+TEXT_EXTENSIONS = %w[
+  txt md markdown rdoc
+  css sass scss less html xml
+  rb gemspec gemfile erb haml rabl rake
+  js jsx ts flow coffee
+  yml yaml json toml csv
+]
+
+IGNORE_EXTENSIONS = %w[
+  map cache
+  h o so
+  png jpg gif pdf ico svg
+]
+
+IGNORE_PATTERNS = [
+  %r{/\.git/},
+  /\.(#{IGNORE_EXTENSIONS.join("|")})$/,
+]
+
+class Script
+  attr_reader :queries, :options
+
+  def initialize(queries, options)
+    @queries = queries
+    @options = options
+  end
+
+  def call
+    Dir.chdir(options[:dir]) unless options[:dir] == Dir.pwd
+    # binding.pry if options[:pry]
+    queries.each { |query| search query }
+  end
+
+  def search(query)
+    return string_search(query) if options[:string]
+    return regex_search(query) if options[:regex] || query.start_with?("/")
+
+    string_search(query)
+  end
+
+  def fglob(dir)
+    puts "Globing #{dir}" if options[:debug]
+    Enumerator.new do |y|
+      Dir.glob(File.join(dir, "**", "*"), File::FNM_DOTMATCH).each do |path|
+        y << path if File.file?(path)
+      end
+    end
+  end
+
+  # use `file` shell command to determine if file contains text (not binary)
+  def text_file?(path)
+    ext = File.extname(path)[1..] # remove leading dot (.)
+    return true if TEXT_EXTENSIONS.member?(ext)
+
+    type = `file #{path}`.strip.split(":").last
+    return true if type.include?("text")
+
+    puts "Skipping non-text file: #{[path, type].inspect}" if options[:debug]
+    false
+  end
+
+  def project_files
+    fglob Dir.pwd
+  end
+
+  def bundle_files
+    Enumerator.new do |y|
+      `bundle show --paths`.lines(chomp: true).each do |libdir|
+        fglob(libdir).each { |f| y << f }
+      end
+    end
+  end
+
+  def search_files
+    size_range = (1..options[:max_file_size]) # exclude large and empty files
+    Enumerator.new do |y|
+      [project_files, bundle_files].each do |files|
+        files.each do |path|
+          unless size_range.cover?(File.size(path))
+            puts "Ignoring large or empty file: #{path}" if options[:debug]
+            next
+          end
+
+          if options[:ignores].any? { |ignore| match?(path, ignore) }
+            puts "Ignoring file on ignore list: #{path}" if options[:debug]
+            next
+          end
+
+          y << path if text_file?(path)
+        end
+      end
+    end
+  end
+
+  def match?(haystack, needle)
+    case needle
+    when String
+      if needle.start_with?("/") # maybe it's user supplied regex
+        pattern = eval(needle) rescue nil # if it doesn't eval, assume not regex
+        return match?(haystack, pattern) if pattern
+      end
+      haystack.include?(needle)
+    when Regexp
+      haystack =~ needle
+    else
+      false
+    end
+  end
+
+  def match_files
+    search_files.each do |file|
+      puts file if yield(file)
+      next unless options[:contents]
+
+      matches = []
+      File.readlines(file, chomp: true).each_with_index do |line, i|
+        matches << [i + 1, line] if yield(line)
+      end
+      if matches.any?
+        puts file
+        matches.each { |num, line| puts " #{num}: #{line}" }
+      end
+    end
+  end
+
+  def string_search(query)
+    puts "Performing string search with: #{query.inspect}"
+    match_files { |line| line.include?(query) }
+  end
+
+  def regex_search(query)
+    query =
+      begin
+        eval(query) # convert regex literal string to Regexp object via ruby
+      rescue SyntaxError => e
+        Regexp.new(query) # assume regexp contents are being provided
+      end
+    puts "Performing regular expression search with: #{query.inspect}"
+    match_files { |line| line =~ query }
+  end
+
+  def self.parse_options(argv)
+    options = {
+      contents:       true,
+      dir:            Dir.pwd,
+      string:         false,
+      regex:          false,
+      ignores:        IGNORE_PATTERNS,
+      max_file_size:  MAX_FILE_SIZE,
+      debug:          false,
+    }
+    args = OptionParser.new do |op|
+      op.banner = "Usage: bundle_search [options] query"
+
+      op.on("-d DIR", "--dir DIR", "Project working directory") do |dir|
+        options[:dir] = dir
+      end
+
+      op.on("--names", "-n", "Search file names only") do
+        options[:contents] = false
+      end
+
+      op.on("--string-search", "-s", "Force treating queries as string searches") do
+        options[:string] = true
+      end
+
+      op.on("--regular-expression", "--regex", "-r", "Force treating queries as regular expressions") do
+        options[:regex] = true
+      end
+
+      op.on("-i IGNORE", "--ignore IGNORE", "Files/folders to not search") do |path|
+        options[:ignores] << path
+      end
+
+      op.on("--debug", "-d", "Enable debugg (loggin) mode") do
+        options[:debug] = true
+      end
+
+      # op.on("--console", "Give a pry console instead of executing search") do
+      #   options[:pry] = true
+      # end
+
+      op.on("-h", "--help") do
+        puts op
+        puts example_usage
+      end
+    end.parse(argv)
+    new(args, options)
+  end
+end
+
+Script.parse_options(ARGV).()
