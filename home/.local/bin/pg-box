@@ -2,6 +2,8 @@
 
 require "optparse"
 require "open3"
+require "fileutils"
+require "shellwords"
 
 DEFAULT_DIR = "~/.local/share/postgres"
 
@@ -14,6 +16,7 @@ class Script < Struct.new(:options)
     options = {
       dir: File.expand_path(DEFAULT_DIR),
       init: true,
+      version: "latest",
     }
 
     args = OptionParser.new do |op|
@@ -25,6 +28,10 @@ class Script < Struct.new(:options)
 
       op.on("-d DIR", "--dir DIR", "Postgres working+data dir. Default is #{DEFAULT_DIR}") do |dir|
         options[:dir] = File.expand_path(dir)
+      end
+
+      op.on("--version VERSION", "Version of postgres container to pull. Default is latest.") do |version|
+        options[:version] = version
       end
 
       op.on("--no-init", "Don't try to initialize if db dir check fails") do
@@ -43,9 +50,7 @@ class Script < Struct.new(:options)
   def call
     find_or_create_postgres_box unless options[:distrobox]
 
-    FileUtils.mkpath(options[:dir]) unless File.exist?(options[:dir])
-
-    init_data_dir if options[:init] && !data_dir_initialized?
+    init_data_dir if options[:init] && !File.exist?(data_dir)
 
     puts "Running postgres on distrobox '#{options[:distrobox]}'"
     cmd = dbx_exec("postgres -D #{data_dir} -k #{options[:dir]}")
@@ -58,23 +63,30 @@ class Script < Struct.new(:options)
   end
 
   def dbx_exec(cmd)
-    "distrobox enter #{options[:distrobox]} -- #{cmd}"
-  end
-
-  def data_dir_initialized?
-    # postgresql-check-db-dir ~/.local/share/postgres/data
-    cmd = dbx_exec("postgresql-check-db-dir #{data_dir}")
+    cmd = "distrobox enter #{options[:distrobox]} -- #{cmd}"
     puts "$ #{cmd}"
-    _out, status = Open3.capture2e(cmd)
-    status.success?
+    system cmd
   end
 
   def init_data_dir
-    raise "init_data_dir not implemented"
+    FileUtils.mkpath(data_dir)
+    # initdb --locale en_US.UTF-8 -D ~/.local/share/postgres/data
+    dbx_exec("initdb --locale en_US.UTF-8 -D #{Shellwords.escape(data_dir)}")
   end
 
   def find_or_create_postgres_box
-    raise "find_or_create_postgres_box not implemented"
+    list = `distrobox list --no-color`.lines.map{|l| l.split("|").map(&:strip) }
+    existing_boxes = list[1..].map { |box| list[0].zip(box).to_h }
+
+    if existing_boxes.none? { |box| box["NAME"] == "postgres" }
+      puts "Creating distrobox from docker.io/postgres container"
+      cmd = "distrobox create --image docker.io/postgres:#{options[:version]} --name postgres --pull"
+
+      puts "$ #{cmd}"
+      system cmd
+    end
+
+    options[:distrobox] = "postgres"
   end
 end
 
