@@ -53,9 +53,7 @@ class Script < Struct.new(:options)
     init_data_dir if options[:init] && !File.exist?(data_dir)
 
     puts "Running postgres on distrobox '#{options[:distrobox]}'"
-    cmd = dbx_exec("postgres -D #{data_dir} -k #{options[:dir]}")
-    puts "$ #{cmd}"
-    exec cmd
+    dbx_exec("postgres -D #{data_dir} -k #{options[:dir]}")
   end
 
   def data_dir
