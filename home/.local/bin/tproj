@@ -78,21 +78,32 @@ def parse_options(argv)
     op.on("-a ABBR", "--abbr ABBR", "Abbreviation for project. Used as tmux session name.") do |abbr|
       options["abbr"] = abbr
     end
+
     op.on("-d DIR", "--dir DIR", "Project working directory") do |dir|
       options["dir"] = dir
     end
+
     op.on("-w WINDOWS", "--windows WINDOWS", Integer, "Number of tmux windows in project") do |windows|
       options["windows"] = [windows, 1].max
     end
+
     op.on("--[no-]start", "Overrides project start option for pre-filled commands") do |start|
       options["start"] = start
     end
+
     op.on("-x [DISTROBOX]", "--distrobox [DISTROBOX]", "Create tmux session within specified distrobox. If blank, run on host (no distrobox).") do |distrobox|
       options["distrobox"] = distrobox
     end
+
     op.on("--detach", "Do not attach to the created tmux session") do
       options["detach"] = true
     end
+
+    # useful if session needs to wait for difficult to status services
+    op.on("--delay SECONDS", Float, "Number of seconds to wait before starting session") do |seconds|
+      sleep seconds
+    end
+
     op.on("-h", "--help") do
       puts op
       puts example_usage
