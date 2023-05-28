@@ -9,7 +9,8 @@ require "optparse"
 # tproj project-name <- start or resume a specific project
 
 # looks in ~/.config/tproj.conf for project configs
-@debug = true
+
+$debug = false
 
 class Project
   OVERWRITEABLE = %w[dir windows start distrobox detach]
@@ -99,6 +100,10 @@ def parse_options(argv)
       options["detach"] = true
     end
 
+    op.on("--debug", "Enable debug output") do
+      $debug = true
+    end
+
     # useful if session needs to wait for difficult to status services
     op.on("--delay SECONDS", Float, "Number of seconds to wait before starting session") do |seconds|
       sleep seconds
@@ -123,6 +128,10 @@ def fatal_error(msg, exit_status = 1)
   exit exit_status
 end
 
+def debug?
+  $debug
+end
+
 def projects(path = default_config_path)
   YAML.load_file(path).map { |config| Project.new(config) }
 end
@@ -145,7 +154,7 @@ end
 
 def find_existing_sessions(proj)
   cmd = proj.tmux_cmd("list-sessions")
-  puts "$ #{cmd}" if @debug
+  puts "$ #{cmd}" if debug?
   stdout, _stderr, status = Open3.capture3(cmd)
   if status.success?
     stdout.split("\n").map {|line| line.split(":").first }
@@ -187,7 +196,7 @@ def set_terminal_title(title)
 end
 
 def run(cmd)
-  puts "$ #{cmd}" if @debug
+  puts "$ #{cmd}" if debug?
   system cmd
 end
 
@@ -207,7 +216,7 @@ set_terminal_title("tmux: #{current.names.first}")
 
 if find_existing_sessions(current).member?(current.abbr)
   cmd = current.tmux_cmd("attach -t #{current.abbr}")
-  puts "> #{cmd}" if @debug
+  puts "> #{cmd}" if debug?
   exec cmd
   # ^ replaces process, so execution stops there
 end
@@ -227,7 +236,7 @@ delayed = []
     ]
     tmux_cmd_parts << "Enter" if cmd && current.start
     full_tmux_cmd = current.tmux_cmd(*tmux_cmd_parts)
-    puts "DELAYED$ #{full_tmux_cmd}" if @debug
+    puts "DELAYED$ #{full_tmux_cmd}" if debug?
     delayed << full_tmux_cmd
   end
   if label
@@ -245,6 +254,6 @@ run current.tmux_cmd("select-window -t #{current.abbr}:1")
 # finally, attach to the new session
 if current.attach?
   cmd = current.tmux_cmd("attach -t #{current.abbr}")
-  puts "> #{cmd}" if @debug
+  puts "> #{cmd}" if debug?
   exec cmd
 end
