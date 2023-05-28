@@ -66,6 +66,11 @@ else
     # assume we have natively installed code/vscode
     # no need for additional aliases in this case
   end
+
+  if type -q pulsar
+    alias puls=pulsar
+  end
+
   if test -d ~/.var/app/dev.pulsar_edit.Pulsar
     alias puls='flatpak run dev.pulsar_edit.Pulsar'
   end
