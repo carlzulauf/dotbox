@@ -75,16 +75,18 @@ class Script < Struct.new(:options)
   def find_or_create_postgres_box
     list = `distrobox list --no-color`.lines.map{|l| l.split("|").map(&:strip) }
     existing_boxes = list[1..].map { |box| list[0].zip(box).to_h }
+    version = "postgres:#{options[:version]}"
+    name = options[:version] == "latest" ? "pg" : version.gsub(/[:\.]/, '_')
 
-    if existing_boxes.none? { |box| box["NAME"] == "postgres" }
+    if existing_boxes.none? { |box| box["NAME"] == name }
       puts "Creating distrobox from docker.io/postgres container"
-      cmd = "distrobox create --image docker.io/postgres:#{options[:version]} --name postgres --pull"
+      cmd = "distrobox create --image docker.io/#{version} --name #{name} --pull"
 
       puts "$ #{cmd}"
       system cmd
     end
 
-    options[:distrobox] = "postgres"
+    options[:distrobox] = name
   end
 end
 
