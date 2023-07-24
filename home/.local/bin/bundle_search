@@ -8,24 +8,36 @@ require "optparse"
 # bundle_search /accounts\.yml/i <- Find files containing lines matching regular expression
 
 MAX_FILE_SIZE = 16 * 1024 * 1024 # 16MB. Don't search files bigger than this.
+MAX_LINE_SIZE = 4098 # we've definitely hit compressed/minified data. skip line.
 
 # we don't need to use `file` to check for text files if these extensions are used
 TEXT_EXTENSIONS = %w[
   txt md markdown rdoc
-  css sass scss less html xml
-  rb gemspec gemfile erb haml rabl rake
-  js jsx ts flow coffee
-  yml yaml json toml csv
+  css sass scss less html xml svg
+  rb gemspec gemfile erb haml rabl rake ru
+  js jsx ts flow coffee vue svelte
+  java c h cpp py
+  yml yaml json toml csv sql
+  sh bash tf
+  DS_Store
+]
+
+TEXT_FILES = %w[
+  Gemfile Rakefile
+  Dockerfile Procfile
+  LICENSE README
 ]
 
 IGNORE_EXTENSIONS = %w[
   map cache
   h o so
-  png jpg gif pdf ico svg
+  png jpg gif pdf ico
+  zip gz bzip
 ]
 
 IGNORE_PATTERNS = [
   %r{/\.git/},
+  %r{/\.cache/},
   /\.(#{IGNORE_EXTENSIONS.join("|")})$/,
 ]
 
@@ -39,7 +51,6 @@ class Script
 
   def call
     Dir.chdir(options[:dir]) unless options[:dir] == Dir.pwd
-    # binding.pry if options[:pry]
     queries.each { |query| search query }
   end
 
@@ -62,7 +73,24 @@ class Script
   # use `file` shell command to determine if file contains text (not binary)
   def text_file?(path)
     ext = File.extname(path)[1..] # remove leading dot (.)
+    name = File.basename(path)
+
+    # probably an attachment
+    return false if !ext && path.include?('/storage/') && File.basename(path).length == 28
+
+    # probably minified js
+    return false if ext == 'js' && (path.include?('/public/packs/') || path.include?('/public/packs-test/'))
+
+    # ignore bootsnap and other tmp trash
+    return false if path.include?('/tmp/cache/')
+
     return true if TEXT_EXTENSIONS.member?(ext)
+    return true if TEXT_FILES.member?(name)
+
+    # ignore dotfiles for now
+    return false if name.start_with?('.')
+
+    puts "Using `file` util to determine if text file: #{path.inspect}" if options[:debug]
 
     type = `file #{path}`.strip.split(":").last
     return true if type.include?("text")
@@ -88,6 +116,11 @@ class Script
     Enumerator.new do |y|
       [project_files, bundle_files].each do |files|
         files.each do |path|
+          unless options[:contents] # filename match only, don't filter files by content/type
+            y << path
+            next
+          end
+
           unless size_range.cover?(File.size(path))
             puts "Ignoring large or empty file: #{path}" if options[:debug]
             next
@@ -95,6 +128,11 @@ class Script
 
           if options[:ignores].any? { |ignore| match?(path, ignore) }
             puts "Ignoring file on ignore list: #{path}" if options[:debug]
+            next
+          end
+
+          if options[:keep].any? && options[:keep].none? { |keep| match?(path, keep) }
+            puts "Ignoring file not on keep list: #{path}" if options[:debug]
             next
           end
 
@@ -126,8 +164,10 @@ class Script
 
       matches = []
       File.readlines(file, chomp: true).each_with_index do |line, i|
+        next if line.length > options[:max_line_size]
         matches << [i + 1, line] if yield(line)
       end
+
       if matches.any?
         puts file
         matches.each { |num, line| puts " #{num}: #{line}" }
@@ -158,7 +198,9 @@ class Script
       string:         false,
       regex:          false,
       ignores:        IGNORE_PATTERNS,
+      keep:           [],
       max_file_size:  MAX_FILE_SIZE,
+      max_line_size:  MAX_LINE_SIZE,
       debug:          false,
     }
     args = OptionParser.new do |op|
@@ -172,11 +214,11 @@ class Script
         options[:contents] = false
       end
 
-      op.on("--string-search", "-s", "Force treating queries as string searches") do
+      op.on("--string-search", "-s", "Force treating query as string search") do
         options[:string] = true
       end
 
-      op.on("--regular-expression", "--regex", "-r", "Force treating queries as regular expressions") do
+      op.on("--regular-expression", "--regex", "-r", "Force treating query as regular expression") do
         options[:regex] = true
       end
 
@@ -184,7 +226,11 @@ class Script
         options[:ignores] << path
       end
 
-      op.on("--debug", "-d", "Enable debugg (loggin) mode") do
+      op.on("-k KEEP", "--keep KEEP", "If specified, only files matching these patterns are included") do |path|
+        options[:keep] << path
+      end
+
+      op.on("--debug", "-d", "Enable debug (logging) mode") do
         options[:debug] = true
       end
 
@@ -194,10 +240,26 @@ class Script
 
       op.on("-h", "--help") do
         puts op
+        puts
         puts example_usage
+        exit
       end
     end.parse(argv)
     new(args, options)
+  end
+
+  def self.example_usage
+    puts <<~USAGEDOC
+      Usage examples:
+
+       # if you don't specify, tries to detect match type based on input format
+       $ bundle_search pattern # string search
+       $ bundle_search /pattern/ # regex
+
+       # using some options
+       $ bundle_search -d project/dir --names search_string
+       $ bundle_search --ignore=warden-1.2.9 --ignore=thor-1.0.1 /needle/
+    USAGEDOC
   end
 end
 
