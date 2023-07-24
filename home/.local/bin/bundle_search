@@ -38,6 +38,8 @@ IGNORE_EXTENSIONS = %w[
 IGNORE_PATTERNS = [
   %r{/\.git/},
   %r{/\.cache/},
+  %r{/public/packs(-test)?/},
+  %r{/tmp/cache/},
   /\.(#{IGNORE_EXTENSIONS.join("|")})$/,
 ]
 
@@ -77,12 +79,6 @@ class Script
 
     # probably an attachment
     return false if !ext && path.include?('/storage/') && File.basename(path).length == 28
-
-    # probably minified js
-    return false if ext == 'js' && (path.include?('/public/packs/') || path.include?('/public/packs-test/'))
-
-    # ignore bootsnap and other tmp trash
-    return false if path.include?('/tmp/cache/')
 
     return true if TEXT_EXTENSIONS.member?(ext)
     return true if TEXT_FILES.member?(name)
