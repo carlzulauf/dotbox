@@ -1,6 +1,10 @@
 require 'pp'
 require 'json'
 
+if defined?(IRB)
+  IRB.conf[:USE_AUTOCOMPLETE] = false
+end
+
 # Enable mapping an array of hashes by key: hashes.map[:key]
 Enumerator.send(:define_method, :[]) { |key| map { |obj| obj[key] } }
 
