@@ -52,9 +52,22 @@ Found some more conflicting keybindings here, which I cleared out:
 
 ```
 gsettings list-recursively org.gnome.desktop.wm.keybindings
-gsettings set org.gnome.desktop.wm.keybindings switch-to-workspace-5 "[]"
-gsettings set org.gnome.desktop.wm.keybindings switch-to-workspace-6 "[]"
-...
+```
+
+... using pry
+
+```
+pry> (1..10).map{|n| cmd = %{gsettings set org.gnome.desktop.wm.keybindings switch-to-workspace-#{n} "[]"}; puts "$ #{cmd}"; system cmd }
+$ gsettings set org.gnome.desktop.wm.keybindings switch-to-workspace-1 "[]"
+$ gsettings set org.gnome.desktop.wm.keybindings switch-to-workspace-2 "[]"
+$ gsettings set org.gnome.desktop.wm.keybindings switch-to-workspace-3 "[]"
+$ gsettings set org.gnome.desktop.wm.keybindings switch-to-workspace-4 "[]"
+$ gsettings set org.gnome.desktop.wm.keybindings switch-to-workspace-5 "[]"
+$ gsettings set org.gnome.desktop.wm.keybindings switch-to-workspace-6 "[]"
+$ gsettings set org.gnome.desktop.wm.keybindings switch-to-workspace-7 "[]"
+$ gsettings set org.gnome.desktop.wm.keybindings switch-to-workspace-8 "[]"
+$ gsettings set org.gnome.desktop.wm.keybindings switch-to-workspace-9 "[]"
+$ gsettings set org.gnome.desktop.wm.keybindings switch-to-workspace-10 "[]"
 ```
 
 [This answer](https://forum.manjaro.org/t/super-number-shortcut-dont-work/117651/2) points to using dconf editor to edit hidden keybindings in the following locations. I didn't understand the answer at the time but it's ultimately very helpful.
