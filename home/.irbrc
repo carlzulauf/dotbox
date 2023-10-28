@@ -158,7 +158,7 @@ def show_ops(name = "Rate")
       break if Time.now > stop_at
     end
     elapsed = Time.now - start_at
-    print "\r#{name}: #{(count / elapsed).round(2)} ops/sec"
+    print "\r#{name}: #{(count / elapsed).round(4)} ops/sec"
   end
 end
 
