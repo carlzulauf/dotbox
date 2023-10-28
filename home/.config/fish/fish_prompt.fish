@@ -1,4 +1,4 @@
-# copied from terlar font found in `fish_config prompt show`
+# copied from terlar prompt found in `fish_config prompt show`
 function fish_prompt --description 'Write out the prompt'
   set -l last_status $status
 
