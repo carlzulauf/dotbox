@@ -1,5 +1,5 @@
----
-- abbr: dotb
+dotbox:
+  abbr: dotb
   dir: "~/projects/dotbox"
   names:
   - dotb
@@ -13,10 +13,10 @@
   -
   - pry
   start: false # don't run pre-filled commands
-- abbr: dotp
+dotbox-private:
+  abbr: dotp
   dir: "~/projects/dotbox-private"
   names:
   - dotp
-  - dotbox-private
   - dotpriv
   windows: 2

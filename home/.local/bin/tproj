@@ -3,6 +3,7 @@
 require "yaml"
 require "open3"
 require "optparse"
+require "pry"
 
 # Usage:
 # tproj <- get a list of available projects (configured below)
@@ -14,10 +15,11 @@ $debug = false
 
 class Project
   OVERWRITEABLE = %w[dir windows start distrobox detach]
-  attr_reader :options
+  attr_reader :key, :options
 
-  def initialize(options)
-    @options  = options
+  def initialize(key = nil, options)
+    @key = key
+    @options = options
   end
 
   def apply(other_options)
@@ -35,7 +37,7 @@ class Project
   end
 
   def names
-    [abbr, *options.fetch("names", [])].uniq
+    [abbr, key, *options.fetch("names", [])].compact.uniq
   end
 
   def windows
@@ -119,21 +121,27 @@ def parse_options(argv)
   options
 end
 
-def default_config_path
-  File.expand_path("~/.config/tproj.yml")
+def host
+  File.read('/etc/hostname').strip
+rescue Errno::ENOENT
+  require 'socket'
+  Socket.gethostname
 end
 
-def fatal_error(msg, exit_status = 1)
-  STDERR.puts msg
-  exit exit_status
+# listed by precedence, ascending
+def project_config_paths
+  [
+    File.expand_path("~/.config/tproj.yml"),
+    File.expand_path("~/.config/tproj.#{host}.yml")
+  ].select { |path| File.exist? path }
 end
 
-def debug?
-  $debug
+def project_configs
+  project_config_paths.map { |path| YAML.load_file(path) }.reduce(&:merge)
 end
 
-def projects(path = default_config_path)
-  YAML.load_file(path).map { |config| Project.new(config) }
+def projects
+  project_configs.map { |key, config| Project.new(key, config) }
 end
 
 def create_project(abbr, dir, windows = 1, *_)
@@ -150,6 +158,15 @@ def find_project(name)
     return project if project.names.member?(name)
   end
   nil
+end
+
+def fatal_error(msg, exit_status = 1)
+  STDERR.puts msg
+  exit exit_status
+end
+
+def debug?
+  $debug
 end
 
 def find_existing_sessions(proj)

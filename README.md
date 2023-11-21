@@ -75,10 +75,10 @@ See the [included config](home/.config/tproj.yml) for some examples. Once config
 tproj dotbox
 ```
 
-You can also create sessions for projects that are not yet configured supplying more details to the command. If you want a tmux session with 5 windows for `~/project/my_project` it might look like this:
+You can also create sessions for projects that are not yet configured by supplying more details to the command. If you want a tmux session with 5 windows for `~/project/my_project` it might look like this:
 
 ```
-tproj mine ~/projects/my_project 5
+tproj mine ~/projects/my_project --windows=5
 ```
 
 ### `console_saver`
