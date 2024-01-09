@@ -30,7 +30,7 @@ class Script < Struct.new(:options)
         options[:dir] = File.expand_path(dir)
       end
 
-      op.on("--version VERSION", "Version of postgres container to pull. Default is latest.") do |version|
+      op.on("-v VERSION", "--version VERSION", "Version of postgres container to pull. Default is latest.") do |version|
         options[:version] = version
       end
 

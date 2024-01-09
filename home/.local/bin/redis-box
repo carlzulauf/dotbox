@@ -15,6 +15,7 @@ class Script < Struct.new(:options)
       dir: File.expand_path(DEFAULT_DATA_DIR),
       template: File.expand_path(DEFAULT_CONFIG_PATH),
       force: false,
+      version: "latest",
     }
 
     args = OptionParser.new do |op|
@@ -42,6 +43,10 @@ class Script < Struct.new(:options)
 
       op.on("-f", "--force", "Force generation of config file for project, even if one already exists.") do
         options[:force] = true
+      end
+
+      op.on("-v VERSION", "--version VERSION", "Version of redis container to pull. Default is latest.") do |version|
+        options[:version] = version
       end
 
       op.on("-h", "--help") do
@@ -77,16 +82,18 @@ class Script < Struct.new(:options)
   def find_create_distrobox
     list = `distrobox list --no-color`.lines.map{|l| l.split("|").map(&:strip) }
     existing_boxes = list[1..].map { |box| list[0].zip(box).to_h }
+    version = "redis:#{options[:version]}"
+    name = options[:version] == "latest" ? "redis" : version.gsub(/[:\.]/, '_')
 
-    if existing_boxes.none? { |box| box["NAME"] == "redis" }
+    if existing_boxes.none? { |box| box["NAME"] == name }
       puts "Creating distrobox from docker.io/redis container"
-      cmd = "distrobox create --image docker.io/redis --name redis --pull"
+      cmd = "distrobox create --image docker.io/#{version} --name #{name} --pull"
 
       puts "$ #{cmd}"
       system cmd
     end
 
-    options[:distrobox] = "redis"
+    options[:distrobox] = name
   end
 end
 
