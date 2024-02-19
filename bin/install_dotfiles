@@ -179,6 +179,7 @@ class InstallDotfiles < Struct.new(:options)
   end
 
   def check_file_content(src, dest)
+    src = File.realpath(src) if File.symlink?(src)
     create_file = -> do
       puts "Copying `#{src}` to `#{dest}`"
       mkpath(dest.parent)
@@ -216,6 +217,7 @@ class InstallDotfiles < Struct.new(:options)
   end
 
   def check_symlink(src, dest)
+    src = File.realpath(src) if File.symlink?(src)
     create_symlink = -> do
       puts "Creating symlink to `#{src}` at `#{dest}`"
       mkpath(dest.parent)
