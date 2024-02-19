@@ -1,7 +1,7 @@
 require 'pp'
 require 'json'
 
-if defined?(IRB)
+if defined?(IRB) && IRB.respond_to?(:conf)
   IRB.conf[:USE_AUTOCOMPLETE] = false
 end
 
