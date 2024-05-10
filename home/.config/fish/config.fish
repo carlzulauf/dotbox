@@ -15,6 +15,7 @@ if type -q podman-compose
 else
   if type -q docker-compose
     alias dc='docker-compose'
+    alias dcr='docker-compose run --rm -it'
   end
 end
 
