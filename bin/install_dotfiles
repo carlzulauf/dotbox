@@ -9,6 +9,7 @@ DOTBOX_DIR = File.expand_path(File.join(File.expand_path(File.dirname(__FILE__))
 DOTFILES_BASE_DIRS = [File.join(DOTBOX_DIR, "home"), File.join(DOTBOX_DIR, "home-files")]
 INSTALL_DIR = File.expand_path("~")
 BACKUP_DIR = File.expand_path("~/.backup-dotfiles")
+IGNORED_BROKEN_LINKS = [Pathname.new(File.join(INSTALL_DIR, ".steampath"))]
 
 Change = Struct.new(:desc, :src, :dest, :action) do
   def noop?; desc == "✓"; end
@@ -146,7 +147,7 @@ class InstallDotfiles < Struct.new(:options)
   def find_broken_symlinks(files)
     {}.tap do |found|
       files.map(&:parent).uniq.select(&:exist?).each do |dir|
-        dir.children.select{ |f| f.symlink? && !f.exist? }.map do |broken_link|
+        dir.children.select{ |f| broken_symlink?(f) }.map do |broken_link|
           found[broken_link] = change("⊠", File.readlink(broken_link), broken_link) do
             puts "Removing broken symlink: `#{broken_link}`"
             broken_link.unlink
@@ -154,6 +155,10 @@ class InstallDotfiles < Struct.new(:options)
         end
       end
     end
+  end
+
+  def broken_symlink?(path)
+    path.symlink? && !path.exist? && !IGNORED_BROKEN_LINKS.include?(path)
   end
 
   def apply_changes(changes)
