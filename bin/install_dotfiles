@@ -4,6 +4,7 @@ require "fileutils"
 require "pathname"
 require "optparse"
 require "digest/md5"
+require "irb"
 
 DOTBOX_DIR = File.expand_path(File.join(File.expand_path(File.dirname(__FILE__)), ".."))
 DOTFILES_BASE_DIRS = [File.join(DOTBOX_DIR, "home"), File.join(DOTBOX_DIR, "home-files")]
@@ -222,7 +223,7 @@ class InstallDotfiles < Struct.new(:options)
   end
 
   def check_symlink(src, dest)
-    src = File.realpath(src) if File.symlink?(src)
+    src = src.realpath if src.symlink?
     create_symlink = -> do
       puts "Creating symlink to `#{src}` at `#{dest}`"
       mkpath(dest.parent)
