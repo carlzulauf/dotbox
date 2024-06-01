@@ -1,0 +1,23 @@
+#!/usr/bin/env ruby
+
+def show_disk_usage
+  puts "Disk space usage:"
+  system "du -sh /nix/store ~"
+  puts
+end
+
+def cleanup_nixos
+  [
+    "nix-env --delete-generations +4",
+    "sudo nix-env --delete-generations +4",
+    "nix-collect-garbage",
+    "sudo nix-collect-garbage",
+  ].each do |cmd|
+    puts " $ #{cmd}"
+    system "#{cmd} > /dev/null" # only print errors
+  end
+end
+
+show_disk_usage
+cleanup_nixos
+show_disk_usage
