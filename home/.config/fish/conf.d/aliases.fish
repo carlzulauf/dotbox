@@ -8,11 +8,11 @@ alias dcr='docker-compose run --rm -it'
 
 # Replace ls with eza if available
 if type -q eza
-  alias l='eza -a --color=always --group-directories-first --icons'   # short, everything
-  alias ls='eza --color=always --group-directories-first --icons'     # preferred listing
-  alias la='eza -la --color=always --group-directories-first --icons' # all files and dirs
-  alias ll='eza -l --color=always --group-directories-first --icons'  # long format
-  alias lt='eza -T --color=always --group-directories-first --icons'  # tree listing
+  alias l='eza -a --color=always --group-directories-first --icons=auto'   # short, everything
+  alias ls='eza --color=always --group-directories-first --icons=auto'     # preferred listing
+  alias la='eza -la --color=always --group-directories-first --icons=auto' # all files and dirs
+  alias ll='eza -l --color=always --group-directories-first --icons=auto'  # long format
+  alias lt='eza -T --color=always --group-directories-first --icons=auto'  # tree listing
   alias l.="eza -a | egrep '^\.'"                                     # show only dotfiles
 else
   # ls aliases here
