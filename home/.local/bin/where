@@ -1,0 +1,22 @@
+#!/usr/bin/env ruby
+
+# Wrapper for `which`.
+# Displays real location in operating systems like NixOS, where `which` would return the path to a symlink.
+
+require 'open3'
+
+out, err, status = Open3.capture3("which", *ARGV)
+
+if status.success?
+  maybe_symlink = out.chomp
+  exit if maybe_symlink.empty?
+
+  if File.symlink?(maybe_symlink)
+    puts File.realpath(maybe_symlink)
+  else
+    puts maybe_symlink
+  end
+else
+  raise err unless err.empty?
+end
+
