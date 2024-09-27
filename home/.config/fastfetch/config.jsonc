@@ -8,7 +8,7 @@
     "kernel",
     "uptime",
     "shell",
-    "de",
+    "de", "wm",
     "terminal",
     "terminalfont",
     "cpu",
