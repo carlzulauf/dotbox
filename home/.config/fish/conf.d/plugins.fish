@@ -26,7 +26,12 @@ if type -q direnv
   direnv hook fish | source
 end
 
-# if asdf is in the usual place, load it
-if test -f /opt/asdf-vm/asdf.fish
-  source /opt/asdf-vm/asdf.fish
+# maybe asdf is installed for the current user
+if test -f ~/.asdf/asdf.fish
+  source ~/.asdf/asdf.fish
+else
+  # otherwise, if asdf is installed globally in the usual place, load it
+  if test -f /opt/asdf-vm/asdf.fish
+    source /opt/asdf-vm/asdf.fish
+  end
 end
