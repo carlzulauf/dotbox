@@ -67,41 +67,6 @@ def read_utf16
   JSON.parse(%|"#{STDIN.gets(chomp: true)}"|)
 end
 
-def opassword_items
-  @opassword_items ||= JSON.parse(`op list items`)
-end
-
-def opassword_summarize(items = opassword_items)
-  return(puts "No matching items") if items.empty?
-  titles_and_uuids = items.map do |item|
-    title = item.dig("overview", "title")
-    title ||= "<untitled>"
-    [title, item["uuid"]]
-  end
-  tp [ ["Title", "UUID"], *titles_and_uuids ]
-end
-
-def opassword_search(pattern, summarize = true)
-  pattern = %r{#{pattern}} if pattern.is_a?(String)
-  matches = opassword_items.select do |item|
-    item.dig("overview", "title") =~ pattern
-  end
-  summarize ? opassword_summarize(matches) : matches
-end
-
-def opassword_get(item)
-  cmd = ["op get item"]
-  case item
-  when Hash then cmd << item["uuid"]
-  when /^[a-zA-Z0-9]{26}$/ then cmd << item # uuid
-  else # assume by title
-    found = opassword_search(item, false)
-    return :not_found unless found.any?
-    return found.map { |item| opassword_get(item) }
-  end
-  JSON.parse(%x{#{cmd.join(' ')}})
-end
-
 if defined?(ActiveSupport::TimeZone)
   def tz
     ActiveSupport::TimeZone["US/Mountain"]
