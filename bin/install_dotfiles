@@ -13,7 +13,9 @@ BACKUP_DIR = File.expand_path("~/.backup-dotfiles")
 IGNORED_BROKEN_LINKS = [Pathname.new(File.join(INSTALL_DIR, ".steampath"))]
 
 Change = Struct.new(:desc, :src, :dest, :action) do
-  def noop?; desc == "✓"; end
+  def noop?
+    desc == "✓" || action.nil?
+  end
 end
 
 class InstallDotfiles < Struct.new(:options)
@@ -25,29 +27,62 @@ class InstallDotfiles < Struct.new(:options)
       parser.on(
           "-d [DIRECTORY]",
           "--install-dir [DIRECTORY]",
-          "Directory to use (if you don't want `#{options[:install_dir]}`).") do |dir|
+          "Directory to use (if you don't want `#{options[:install_dir]}`)."
+      ) do |dir|
         options[:install_dir] = File.expand_path(dir)
       end
 
       parser.on(
           "-b [DIRECTORY]",
           "--backup-dir [DIRECTORY]",
-          "Directory to backup existing dotfiles to. Default: `#{options[:backup_dir]}`.") do |dir|
+          [
+            "Directory to backup existing dotfiles to.",
+            "Default: `#{options[:backup_dir]}`.",
+          ].join(" ")
+      ) do |dir|
         options[:backup_dir] = File.expand_path(dir)
       end
 
       parser.on(
           "-p [DIRECTORY]",
           "--private-dir [DIRECTORY]",
-          "Add private directory for installer to layer into `#{options[:install_dir]}`.") do |dir|
+          [
+            "Add private directory for installer to layer into",
+            "`#{options[:install_dir]}`.",
+          ].join(" ")
+      ) do |dir|
         options[:private_dirs] << File.expand_path(dir)
       end
 
       parser.on(
           "-s [DIRECTORY]",
           "--dots-dir [DIRECTORY]",
-          "Add directory as base layer of dotfiles. Usually where most of them are. Defaults: `#{DOTFILES_BASE_DIRS.join('; ')}`.") do |dir|
+          [
+            "Add directory as base layer of dotfiles.",
+            "Usually where most of them are.",
+            "Defaults: `#{DOTFILES_BASE_DIRS.join(';')}`.",
+          ].join(" ")
+      ) do |dir|
         options[:dots_dirs] << File.expand_path(dir)
+      end
+
+      parser.on(
+          "-x [DIRECTORY]",
+          "--hooks-dir [DIRECTORY]",
+          [
+            "Add directory containing executable hooks.",
+            "All executables are ran after installing dotfiles.",
+          ].join(" ")
+      ) do |dir|
+        options[:hooks_dirs] << File.expand_path(dir)
+      end
+
+      parser.on(
+          "-v",
+          "--verbose",
+          "Enable more verbose output."
+      ) do
+        options[:verbose] = true
       end
     end.parse(argv)
     new(options)
@@ -59,7 +94,9 @@ class InstallDotfiles < Struct.new(:options)
       install_dir: INSTALL_DIR,
       backup_dir: BACKUP_DIR,
       symlinks: true,
+      verbose: false,
       private_dirs: [],
+      hooks_dirs: []
     }
   end
 
@@ -68,6 +105,7 @@ class InstallDotfiles < Struct.new(:options)
     display_config(changes)
     confirm_install if changes.any?(&:action)
     apply_changes(changes)
+    run_hooks
   end
 
   private
@@ -94,8 +132,17 @@ class InstallDotfiles < Struct.new(:options)
     options[:private_dirs].map { |dir| Pathname.new(dir) }
   end
 
+  def hooks_paths
+    dirs = options[:hooks_dirs].any? ? options[:hooks_dirs] : default_hooks_paths
+    dirs.map{ |dir| Pathname.new(dir) }.select(&:exist?)
+  end
+
+  def verbose?
+    options.fetch(:verbose, false)
+  end
+
   def default_base_dirs
-    DOTFILES_BASE_DIRS.map{ |dir| Pathname.new(dir) }.select(&:exist?)
+    DOTFILES_BASE_DIRS
   end
 
   def default_private_paths
@@ -104,6 +151,14 @@ class InstallDotfiles < Struct.new(:options)
       dotbox_dir.join("../dotbox-private/home-files"),
       dotbox_dir.join("private"),
       dotbox_dir.join("private-files"),
+    ]
+  end
+
+  def default_hooks_paths
+    [
+      dotbox_dir.join("hooks"),
+      dotbox_dir.join("../dotbox-private/hooks"),
+      dotbox_dir.join("private-hooks"),
     ]
   end
 
@@ -163,11 +218,8 @@ class InstallDotfiles < Struct.new(:options)
   end
 
   def apply_changes(changes)
-    if changes.none?(&:action) # no changes
-      puts "No changes to apply. Exiting."
-      puts
-      exit
-    end
+    return if changes.all?(&:noop?) # no changes
+
     puts "Applying changes..."
     puts
     changes.each do |c|
@@ -177,6 +229,27 @@ class InstallDotfiles < Struct.new(:options)
       end
     end
     puts
+  end
+
+  def run_hooks
+    if hooks_paths.empty?
+      puts nil, "  No hooks found" if verbose?
+      return
+    end
+
+    hooks_paths.each do |dir|
+      next if dir.children.empty?
+
+      puts "Running hooks in #{dir}" if verbose?
+      dir.children.each do |exe|
+        if exe.executable?
+          print "$ #{exe}: "
+          puts(system(exe.to_s) ?  "✓" : "⊠")
+        else
+          puts "Skipping non-executable file: #{exe}" if verbose?
+        end
+      end
+    end
   end
 
   def check_file(src, dest, use_symlink)
@@ -258,7 +331,7 @@ class InstallDotfiles < Struct.new(:options)
 
   def confirm_install
     print "Are you sure you want to apply these changes (Yes/[No])? "
-    answer = gets.strip
+    answer = STDIN.gets.strip
     if answer !~ /^y(es)?$/i
       puts "Received a non-yes response: #{answer.inspect}"
       exit
@@ -267,41 +340,52 @@ class InstallDotfiles < Struct.new(:options)
   end
 
   def display_config(changes)
-    puts
-    puts "dotbox dotfiles installer"
-    puts
-    separator
-    puts "| config"
-    separator
-    puts
-    puts " --install-dir #{install_path}"
-    puts " --backup-dir #{backup_path}"
-    dots_paths.each { |path| puts " --dots-dir #{path}" }
-    private_paths.each { |path| puts " --private-dir #{path}" }
+    if verbose?
+      puts
+      puts "dotbox dotfiles installer"
+      puts
+      separator
+      puts "| config"
+      separator
+      puts
+      puts " --install-dir #{install_path}"
+      puts " --backup-dir #{backup_path}"
+      dots_paths.each { |path| puts " --dots-dir #{path}" }
+      private_paths.each { |path| puts " --private-dir #{path}" }
+    end
+
     puts
     separator
     puts "| dotfile changes for `#{install_path}`"
     separator
-    puts
+
     unchanged, changed = changes.partition(&:noop?)
-    if unchanged.any?
+    if unchanged.any? && verbose?
+      puts
       unchanged.each do |change|
         puts " #{change.desc} #{change.dest}"
       end
-      puts
     end
-    puts "✓ - no change"
-    puts "⊕ - create symlink"
-    puts "+ - create file"
-    puts "⇄ - overwrite existing file (after backup)"
-    puts "↺ - update symlink"
-    puts "⊠ - remove broken symlink"
-    puts
+
+    if changed.any? || verbose?
+      puts
+      puts "✓ - no change" if verbose?
+      puts "⊕ - create symlink"
+      puts "+ - create file"
+      puts "⇄ - overwrite existing file (after backup)"
+      puts "↺ - update symlink"
+      puts "⊠ - remove broken symlink"
+    end
     if changed.any?
+      puts
       changed.each do |change|
         puts " #{change.desc} #{change.dest}"
         puts "   ⤷ #{change.src}" if change.src
       end
+      puts
+    else
+      puts
+      puts "  No changes"
       puts
     end
     separator
