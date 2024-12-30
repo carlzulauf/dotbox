@@ -133,3 +133,11 @@ def truncate_tables
     ActiveRecord::Base.connection.truncate(table)
   end
 end
+
+# pretty print to string
+def pps(obj)
+  StringIO.new.tap do |buffer|
+    PP.pp(obj, buffer)
+    buffer.rewind
+  end.read
+end
