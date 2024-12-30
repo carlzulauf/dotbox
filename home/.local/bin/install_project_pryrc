@@ -1,0 +1,105 @@
+#!/usr/bin/env ruby
+
+require "optparse"
+
+# Can't see my home directory in docker containers and other contexts.
+# This takes our ~/.irbrc and combines it with the tiny amount of pry-specific
+# config found at the bottom of this file.
+
+class Script
+  attr_reader :options
+
+  def initialize(options)
+    @options = options
+  end
+
+  def call
+    File.write(File.join(install_dir, ".pryrc"), combined_rc) if install_pryrc?
+    File.write(File.join(install_dir, ".irbrc"), irbrc_content) if install_irbrc?
+  end
+
+  def irbrc_content
+    File.read(irbrc_path)
+  end
+
+  def combined_rc
+    pryrc_content = DATA.read # read from bottom of this file after END
+    "#{irbrc_content}\n#{pryrc_content}"
+  end
+
+  def install_dir
+    options[:install_dir]
+  end
+
+  def irbrc_path
+    options[:irbrc_path]
+  end
+
+  def install_irbrc?
+    options[:install_irbrc]
+  end
+
+  def install_pryrc?
+    options[:install_pryrc]
+  end
+
+  def self.default_irbrc_path
+    # # expect it to be in dotbox/home, which is currently up two levels
+    # File.expand_path File.join(File.dirname(__FILE__), "..", "..", ".irbrc")
+
+    # Just looks at user's home, even though it's probably symlinked to dotbox/home
+    File.expand_path File.join("~", ".irbrc")
+  end
+
+  def self.default_options
+    {
+      irbrc_path: default_irbrc_path,
+      install_dir: Dir.pwd,
+      install_pryrc: true,
+      install_irbrc: false,
+    }
+  end
+
+  def self.parse_argv(argv, options = default_options)
+    args = OptionParser.new do |op|
+      op.banner = "Usage: install_project_pryrc [options] [project_dir]"
+
+      op.on(
+          "-i [PATH]", "--irbrc [PATH]", "Path to .irbrc to use. Default: #{default_irbrc_path}"
+      ) do |path|
+        options[:irbrc_path] = path
+      end
+
+      op.on("--verbose", "Enable extra output") do
+        options[:verbose] = true
+      end
+
+      op.on("--both", "Install both .pryrc and .irbrc to project") do
+        options[:install_irbrc] = true
+        options[:install_pryrc] = true
+      end
+
+      op.on("--install-irbrc", "Copy .irbrc to project as well") do
+        options[:install_irbrc] = true
+      end
+      op.on("--no-pryrc", "Useful with --install-irbrc if you want only .irbrc installed") do
+        options[:install_pryrc] = true
+      end
+
+      op.on("-h", "--help") do
+        puts op
+        puts example_usage
+      end
+    end.parse(argv)
+
+    options
+  end
+end
+
+Script.new(Script.parse_argv(ARGV)).()
+
+__END__
+# if we're in a project with a log directory, put history there
+if File.directory? File.join(Dir.pwd, "log")
+  Pry.config.history_file = File.join(Dir.pwd, "log", "pry_history")
+end
