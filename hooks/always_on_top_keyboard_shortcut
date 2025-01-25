@@ -1,0 +1,35 @@
+#!/usr/bin/env ruby
+
+require 'open3'
+
+class Script
+  def call
+    if gsettings_installed?
+      install_via_gsettings
+    else
+      print "Missing prerequisites"
+    end
+  end
+
+  private
+
+  def run?(cmd)
+    _stdout, _stderr, status = Open3.capture3(cmd)
+    status.success?
+  end
+
+  def gsettings_installed?
+    run?("which gsettings")
+  end
+
+  def install_via_gsettings
+    cmd = %{gsettings set org.gnome.desktop.wm.keybindings always-on-top "['<Ctrl><Super>t']"}
+    if run?(cmd)
+      print "Installed"
+    else
+      fail "Install failed"
+    end
+  end
+end
+
+Script.new.()

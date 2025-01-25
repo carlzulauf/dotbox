@@ -77,6 +77,10 @@ class InstallDotfiles < Struct.new(:options)
         options[:hooks_dirs] << File.expand_path(dir)
       end
 
+      parser.on("-n", "--skip-hooks", "--no-hooks", "Don't execute hooks on install.") do
+        option[:run_hooks] = false
+      end
+
       parser.on(
           "-v",
           "--verbose",
@@ -96,6 +100,7 @@ class InstallDotfiles < Struct.new(:options)
       symlinks: true,
       verbose: false,
       private_dirs: [],
+      run_hooks: true,
       hooks_dirs: []
     }
   end
@@ -232,8 +237,13 @@ class InstallDotfiles < Struct.new(:options)
   end
 
   def run_hooks
+    unless options[:run_hooks]
+      puts nil, "Hooks skipped" if verbose?
+      return
+    end
+
     if hooks_paths.empty?
-      puts nil, "  No hooks found" if verbose?
+      puts nil, "No hooks found" if verbose?
       return
     end
 
@@ -244,7 +254,7 @@ class InstallDotfiles < Struct.new(:options)
       dir.children.each do |exe|
         if exe.executable?
           print "$ #{exe}: "
-          puts(system(exe.to_s) ?  "✓" : "⊠")
+          puts(system(exe.to_s) ? " ✓" : " ⊠")
         else
           puts "Skipping non-executable file: #{exe}" if verbose?
         end
