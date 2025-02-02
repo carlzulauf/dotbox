@@ -275,7 +275,7 @@ class InstallDotfiles < Struct.new(:options)
       FileUtils.cp(src, dest)
     end
     if dest.exist?
-      if md5(src) == md5(dest) && perms_match?(src, dest)
+      if md5(src) == md5(dest)
         change("✓", src, dest) # do nothing
       else
         change("⇄", src, dest) do
@@ -292,10 +292,6 @@ class InstallDotfiles < Struct.new(:options)
     else
       change("+", src, dest, &create_file)
     end
-  end
-
-  def perms_match?(f1, f2)
-    File.stat(f1).mode == File.stat(f2).mode
   end
 
   def md5(path)
