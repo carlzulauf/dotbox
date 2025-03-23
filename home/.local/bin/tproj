@@ -63,12 +63,26 @@ class Project
     !options["detach"]
   end
 
+  def flake?
+    options["flake"]
+  end
+
   def tmux_cmd(*args)
+    return nix_shell_tmux(*args) if options["flake"]
+
     box = options["distrobox"]
     return ["tmux", *args].join(" ") unless box
 
     tmux_parts = ["tmux -S ~/.local/share/tmux-#{box}.sock", *args].join(" ")
     "distrobox-enter #{box} -- #{tmux_parts}"
+  end
+
+  def nix_shell_tmux(*args)
+    [
+      "nix", "shell",
+      %{--file "#{File.join(dir, 'flake.nix')}"},
+      "--command tmux", *args
+    ].join(" ")
   end
 end
 
@@ -99,6 +113,10 @@ def parse_options(argv)
 
     op.on("--detach", "Do not attach to the created tmux session") do
       options["detach"] = true
+    end
+
+    op.on("--flake", "Attempt to use flake.nix inside project directory via nix shell") do
+      options["flake"] = true
     end
 
     op.on("--debug", "Enable debug output") do
