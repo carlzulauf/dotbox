@@ -1,7 +1,9 @@
-# Add ~/.asdf/shims to PATH early (prepend), but only in containers
-if test ~/.asdf/shims; and test -n "$CONTAINER_ID"
-  if not contains -- ~/.asdf/shims $PATH
-    set --prepend PATH ~/.asdf/shims
+if test -d ~/.asdf/shims
+  # if we're not on NixOS, or we're in a container, then add asdf to PATH
+  if string match -eqv 'NixOS' (uname -a); or test -n "$CONTAINER_ID"
+    if not contains -- ~/.asdf/shims $PATH
+      set --prepend PATH ~/.asdf/shims
+    end
   end
 end
 
