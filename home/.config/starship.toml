@@ -1,4 +1,4 @@
-format = '$username$hostname$localip$shlvl$singularity$kubernetes$directory$vcsh$git_branch$git_commit$git_state$git_metrics$git_status$hg_branch$docker_context$package$bun$c$cmake$cobol$daml$dart$deno$dotnet$elixir$elm$erlang$golang$haskell$helm$java$julia$kotlin$lua$nim$nodejs$ocaml$perl$php$pulumi$purescript$python$raku$rlang$red$ruby$rust$scala$swift$terraform$vlang$vagrant$zig$buf$nix_shell$conda$meson$spack$memory_usage$env_var$crystal$custom$sudo$cmd_duration$line_break$jobs$battery$time$status$shell$character'
+format = '$username$hostname$custom in $localip$shlvl$singularity$kubernetes$directory$vcsh$git_branch$git_commit$git_state$git_metrics$git_status$hg_branch$docker_context$package$bun$c$cmake$cobol$daml$dart$deno$dotnet$elixir$elm$erlang$golang$haskell$helm$java$julia$kotlin$lua$nim$nodejs$ocaml$perl$php$pulumi$purescript$python$raku$rlang$red$ruby$rust$scala$swift$terraform$vlang$vagrant$zig$buf$nix_shell$conda$meson$spack$memory_usage$env_var$crystal$sudo$cmd_duration$line_break$jobs$battery$time$status$shell$character'
 ## FIRST LINE/ROW: Info & Status
 # First param ─┌
 [username]
@@ -9,11 +9,16 @@ show_always = true
 
 # Second param
 [hostname]
-format = "[$hostname]($style) in "
+format = "[$hostname]($style)"
 style = "bold dimmed red"
 trim_at = "-"
 ssh_only = false
 disabled = false
+
+[custom.distrobox]
+command = 'echo $CONTAINER_ID' # shows output of command
+when = ''' test -n "$CONTAINER_ID" '''
+format = '[\[$output\]]($style)'
 
 # Third param
 [directory]
