@@ -18,3 +18,11 @@ end
 #     set --append PATH ~/.gem/ruby/3.0.0/bin
 #   end
 # end
+
+# in NixOS, set gem home to special path and load bins from there into path
+if test -d /nix; and type -q nix-store
+  if test -z "$GEM_HOME"
+    set --global --export GEM_HOME "$HOME/.local/share/nix-gems"
+     set --append PATH "$HOME/.local/share/nix-gems/bin"
+  end
+end
