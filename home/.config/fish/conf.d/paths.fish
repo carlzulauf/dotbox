@@ -23,6 +23,6 @@ end
 if test -d /nix; and type -q nix-store
   if test -z "$GEM_HOME"
     set --global --export GEM_HOME "$HOME/.local/share/nix-gems"
-     set --append PATH "$HOME/.local/share/nix-gems/bin"
+    set --append PATH "$HOME/.local/share/nix-gems/bin"
   end
 end
