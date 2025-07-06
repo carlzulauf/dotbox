@@ -19,8 +19,35 @@ end
 #   end
 # end
 
-# in NixOS, set GEM_HOME to special path unless already set
-if test -d /nix; and type -q nix-store; and test -z "$GEM_HOME"
-  set --global --export GEM_HOME "$HOME/.local/share/nix-gems"
-  set --append PATH "$HOME/.local/share/nix-gems/bin"
+if type -q asdf
+  # clear out everything and let adsf figure it out
+  if test -n "$NIX_GEM_BIN"; and set -l index (contains -i $NIX_GEM_BIN $PATH)
+    set -e PATH[$index]
+  end
+
+  if test -n "$CONTAINER_GEM_BIN"; and set -l index (contains -i $CONTAINER_GEM_BIN $PATH)
+    set -e PATH[$index]
+  end
+
+  set -e GEM_HOME
+else if test -n "$CONTAINER_ID"
+  set --global --export CONTAINER_GEM_HOME "$HOME/.local/share/gems/$CONTAINER_ID"
+  set --global --export CONTAINER_GEM_BIN "$CONTAINER_GEM_HOME/bin"
+
+  if test -n "$NIX_GEM_BIN"; and set -l index (contains -i $NIX_GEM_BIN $PATH)
+    set -e PATH[$index]
+  end
+
+  set GEM_HOME $CONTAINER_GEM_HOME
+  set --append PATH $CONTAINER_GEM_BIN
+else if type -q nix-store
+  set --global --export NIX_GEM_HOME "$HOME/.local/share/gems/nix"
+  set --global --export NIX_GEM_BIN "$NIX_GEM_HOME/bin"
+
+  if test -n "$CONTAINER_GEM_BIN"; and set -l index (contains -i $CONTAINER_GEM_BIN $PATH)
+    set -e PATH[$index]
+  end
+
+  set GEM_HOME $NIX_GEM_HOME
+  set --append PATH $NIX_GEM_BIN
 end
