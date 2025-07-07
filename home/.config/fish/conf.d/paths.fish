@@ -39,7 +39,9 @@ else if test -n "$CONTAINER_ID"
   end
 
   set GEM_HOME $CONTAINER_GEM_HOME
-  set --append PATH $CONTAINER_GEM_BIN
+  if not contains $CONTAINER_GEM_BIN $PATH
+    set --append PATH $CONTAINER_GEM_BIN
+  end
 else if type -q nix-store
   set --global --export NIX_GEM_HOME "$HOME/.local/share/gems/nix"
   set --global --export NIX_GEM_BIN "$NIX_GEM_HOME/bin"
@@ -49,5 +51,7 @@ else if type -q nix-store
   end
 
   set GEM_HOME $NIX_GEM_HOME
-  set --append PATH $NIX_GEM_BIN
+  if not contains $NIX_GEM_BIN $PATH
+    set --append PATH $NIX_GEM_BIN
+  end
 end
