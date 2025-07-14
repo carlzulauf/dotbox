@@ -78,7 +78,7 @@ class InstallDotfiles < Struct.new(:options)
       end
 
       parser.on("-n", "--skip-hooks", "--no-hooks", "Don't execute hooks on install.") do
-        option[:run_hooks] = false
+        options[:run_hooks] = false
       end
 
       parser.on(
