@@ -6,7 +6,8 @@ alias strip_colors='sed \'s/\x1B\[[0-9;]\{1,\}[A-Za-z]//g\''
 alias dc='docker-compose'
 alias dcr='docker-compose run --rm -it'
 
-alias dysk="dysk -a -f 'type=btrfs|type=ext4|type=merger'"
+# show all btrfs and ext4 mount points, plus any merged filesystems, and boot
+alias dysk="dysk -a -f 'type=btrfs|type=ext4|type=merger|type=vfat'"
 
 # Replace ls with eza if available
 if type -q eza
