@@ -216,8 +216,10 @@ def find_or_create_project(options)
   return unless options["abbr"]
 
   # see if it already exists
-  project = find_project(options["abbr"])
-  return project if project
+  if project = find_project(options["abbr"])
+    project.apply(options) # merge stored config with any runtime options
+    return project
+  end
 
   # if we have any of these options besides just abbr
   if %w[dir distrobox windows].any? { |key| options[key] }
