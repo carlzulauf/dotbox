@@ -30,6 +30,10 @@ if type -q pulsar
   alias puls=pulsar
 end
 
+if type -q paru; and not type -q yay
+  alias yay="paru --bottomup"
+end
+
 # if test -e /run/.containerenv; or test -e /.dockerenv
 #   # we're inside of a container/distrobox
 #   alias dc='distrobox-host-exec podman-compose'
