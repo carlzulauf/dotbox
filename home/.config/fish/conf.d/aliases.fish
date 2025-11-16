@@ -7,7 +7,7 @@ alias dc='docker-compose'
 alias dcr='docker-compose run --rm -it'
 
 # show all btrfs and ext4 mount points, plus any merged filesystems, and boot
-alias dysk="dysk -a -f 'type=btrfs|type=ext4|type=merger|type=vfat'"
+alias fsls="dysk -a -f 'type=btrfs|type=ext4|type=merger|type=vfat|type=f2fs|type=ntfs'"
 
 # Replace ls with eza if available
 if type -q eza
