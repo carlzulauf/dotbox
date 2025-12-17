@@ -1,5 +1,4 @@
 {
-  "github.copilot.nextEditSuggestions.enabled": true,
   "files.trimTrailingWhitespace": true,
   "files.insertFinalNewline": true,
   "files.trimFinalNewlines": true,
