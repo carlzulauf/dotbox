@@ -70,8 +70,8 @@ class Project
   def tmux_cmd(*args)
     return nix_shell_tmux(*args) if options["flake"]
 
-    box = options["distrobox"]
-    return ["tmux", *args].join(" ") unless box
+    box = options.fetch("distrobox", "")
+    return ["tmux", *args].join(" ") if box.empty?
 
     tmux_parts = ["tmux -S ~/.local/share/tmux-#{box}.sock", *args].join(" ")
     "distrobox-enter #{box} -- #{tmux_parts}"
