@@ -4,6 +4,7 @@
   "files.insertFinalNewline": true,
   "files.trimFinalNewlines": true,
   "update.showReleaseNotes": false,
+  "workbench.secondarySideBar.defaultVisibility": "hidden",
   "workbench.startupEditor": "none",
   "explorer.autoReveal": false,
   "editor.tabSize": 2
