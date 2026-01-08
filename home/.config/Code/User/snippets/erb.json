@@ -13,13 +13,13 @@
   // 	"description": "Log output to console"
   // }
   "Ruby Value": {
-    "prefix": "=",
+    "prefix": "r=",
     "body": [
       "<%= $0 %>",
     ]
   },
   "Ruby Expression": {
-    "prefix": "-",
+    "prefix": "r-",
     "body": [
       "<% $0 %>",
     ]

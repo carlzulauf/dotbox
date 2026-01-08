@@ -7,5 +7,9 @@
   "workbench.secondarySideBar.defaultVisibility": "hidden",
   "workbench.startupEditor": "none",
   "explorer.autoReveal": false,
-  "editor.tabSize": 2
+  "editor.tabSize": 2,
+  "workbench.secondarySideBar.defaultVisibility": "hidden",
+  "continue.enableNextEdit": true,
+  "explorer.confirmDelete": false,
+  "extensions.ignoreRecommendations": true
 }
