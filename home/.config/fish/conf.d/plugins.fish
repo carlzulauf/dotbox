@@ -6,13 +6,6 @@ if status --is-interactive
   # use starship prompt if it's available
   if type -q starship
     source (starship init fish --print-full-init | psub)
-
-  else # otherwise, look in fish_prompt.fish which uses terlar prompt by default
-
-    if test -f ~/.config/fish/fish_prompt.fish; and type -q prompt_login
-      source ~/.config/fish/fish_prompt.fish
-    end
-
   end
 end
 
