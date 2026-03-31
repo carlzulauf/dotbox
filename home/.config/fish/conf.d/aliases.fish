@@ -33,3 +33,7 @@ end
 if type -q paru; and not type -q yay
   alias yay="paru --bottomup"
 end
+
+if type -q nixos-rebuild
+  alias nix-list-generations="nixos-rebuild list-generations"
+end
