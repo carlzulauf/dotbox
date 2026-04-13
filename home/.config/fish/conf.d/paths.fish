@@ -19,6 +19,7 @@ if is_local_or_asdf_container
     end
 
     set GEM_HOME $NIX_GEM_HOME
+    set GEM_PATH $NIX_GEM_HOME
     if not contains $NIX_GEM_BIN $PATH
       set --append PATH $NIX_GEM_BIN
     end
@@ -39,6 +40,7 @@ else
     set --global --export CONTAINER_GEM_BIN "$CONTAINER_GEM_HOME/bin"
 
     set GEM_HOME $CONTAINER_GEM_HOME
+    set GEM_PATH $CONTAINER_GEM_HOME
     if not contains $CONTAINER_GEM_BIN $PATH
       set --append PATH $CONTAINER_GEM_BIN
     end
