@@ -1,0 +1,96 @@
+#!/usr/bin/env ruby
+
+require "optparse"
+require "fileutils"
+require "shellwords"
+
+DEFAULT_DIR = "~/.local/share/mysql"
+
+class Script < Struct.new(:options)
+  def self.parse_options(argv)
+    options = {
+      dir: File.expand_path(DEFAULT_DIR),
+      init: true,
+      version: "latest",
+    }
+
+    args = OptionParser.new do |op|
+      op.banner = "Usage: mysql-box [options]"
+
+      op.on("-x DISTROBOX", "--distrobox DISTROBOX", "Specify existing distrobox to use. Must have mysql installed.") do |distrobox|
+        options[:distrobox] = distrobox
+      end
+
+      op.on("-d DIR", "--dir DIR", "MySQL working+data dir. Default is #{DEFAULT_DIR}") do |dir|
+        options[:dir] = File.expand_path(dir)
+      end
+
+      op.on("-v VERSION", "--version VERSION", "Version of mysql container to pull. Default is latest.") do |version|
+        options[:version] = version
+      end
+
+      op.on("--no-init", "Don't try to initialize if db dir check fails") do
+        options[:init] = false
+      end
+
+      op.on("-h", "--help") do
+        puts op
+        exit
+      end
+    end.parse(argv)
+
+    self.new options
+  end
+
+  def call
+    find_or_create_mysql_box unless options[:distrobox]
+
+    init_data_dir if options[:init] && !File.exist?(data_dir)
+
+    puts "Running mysql on distrobox '#{options[:distrobox]}'", nil
+    puts " ! Stop mysqld using Ctrl+\\", nil
+    dbx_exec("mysqld --datadir=#{Shellwords.escape(data_dir)} --socket=#{Shellwords.escape(socket_path)} --pid-file=#{Shellwords.escape(pid_path)}")
+  end
+
+  def data_dir
+    File.join(options[:dir], "data")
+  end
+
+  def socket_path
+    File.join(options[:dir], "mysql.sock")
+  end
+
+  def pid_path
+    File.join(options[:dir], "mysql.pid")
+  end
+
+  def dbx_exec(cmd)
+    cmd = "distrobox enter #{options[:distrobox]} -- #{cmd}"
+    puts "$ #{cmd}"
+    system cmd
+  end
+
+  def init_data_dir
+    FileUtils.mkpath(data_dir)
+    dbx_exec("mysqld --initialize-insecure --datadir=#{Shellwords.escape(data_dir)}")
+  end
+
+  def find_or_create_mysql_box
+    list = `distrobox list --no-color`.lines.map{|l| l.split("|").map(&:strip) }
+    existing_boxes = list[1..].map { |box| list[0].zip(box).to_h }
+    version = "mysql:#{options[:version]}"
+    name = options[:version] == "latest" ? "mysql" : version.gsub(/[:\.]/, '_')
+
+    if existing_boxes.none? { |box| box["NAME"] == name }
+      puts "Creating distrobox from docker.io/mysql container"
+      cmd = "distrobox create --image docker.io/#{version} --name #{name} --pull"
+
+      puts "$ #{cmd}"
+      system cmd
+    end
+
+    options[:distrobox] = name
+  end
+end
+
+Script.parse_options(ARGV).()
