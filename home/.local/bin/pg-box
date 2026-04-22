@@ -18,7 +18,7 @@ class Script < Struct.new(:options)
       version: "latest",
     }
 
-    args = OptionParser.new do |op|
+    OptionParser.new do |op|
       op.banner = "Usage: pg-box [options]"
 
       op.on("-x DISTROBOX", "--distrobox DISTROBOX", "Specify existing distrobox to use. Must have postgres installed.") do |distrobox|

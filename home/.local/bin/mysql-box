@@ -14,7 +14,7 @@ class Script < Struct.new(:options)
       version: "latest",
     }
 
-    args = OptionParser.new do |op|
+    OptionParser.new do |op|
       op.banner = "Usage: mysql-box [options]"
 
       op.on("-x DISTROBOX", "--distrobox DISTROBOX", "Specify existing distrobox to use. Must have mysql installed.") do |distrobox|
