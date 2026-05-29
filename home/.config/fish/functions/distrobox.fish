@@ -9,7 +9,7 @@ function is_container
 end
 
 function is_asdf_container
-  if string match -q "asdf" "$CONTAINER_ID"
+  if string match -eq "asdf" "$CONTAINER_ID"
     return 0
   else
     return 1
@@ -21,5 +21,13 @@ function is_local_or_asdf_container
     return (is_asdf_container)
   else
     return 0
+  end
+end
+
+function is_nix
+  if type -q nix-store
+    return 0
+  else
+    return 1
   end
 end
