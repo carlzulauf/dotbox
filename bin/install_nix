@@ -1,0 +1,181 @@
+#!/usr/bin/env ruby
+
+# === NixOS Configuration Installer ===
+# Copies local NixOS configuration files to the system installation path
+# and optionally triggers a rebuild through nixos-rebuild.
+#
+# Usage (from dotbox dir):
+#   bin/install_nix [options]
+#
+# Options:
+#   -s, --switch                Rebuild in 'switch' mode (active immediately)
+#   -b, --boot                  Rebuild in 'boot' mode (active next boot)
+#   -u, --upgrade, --update     Update flake.lock and rebuild
+#   -r, --rebuild               Run nixos-rebuild after copying configs
+#       --no-rebuild            Disable rebuild (overrides other settings)
+#       --build-host=HOST       Remote builder for derivation evaluation
+#       --nax                   Shorthand for --build-host=nax
+#   -h, --help                  Show this help message
+#
+#
+# Configuration:
+#   Config files are read from dotbox's `nix/`` directory.
+#   Installs nix configs to /etc/nixos (requires sudo).
+#
+# Requirements:
+#   - ruby
+#   - rsync
+#   - nix (flake commands)
+#   - sudo access (configurable via --use-sudo/--no-use-sudo if needed)
+
+require 'optparse'
+
+class Script
+  def self.default_options
+    {
+      use_sudo:     true,
+      upgrade:      false,
+      rebuild:      false,
+      build_host:   nil, # remote host to build on
+      rebuild_type: "boot",
+      install_path: "/etc/nixos",
+      host:         default_host,
+      config_dir:   dotbox_config_dir
+    }
+  end
+
+  def self.dotbox_config_dir
+    File.expand_path(File.join(File.dirname(__FILE__), "..", "nix"))
+  end
+
+  def self.default_host
+    `hostname`.strip
+  end
+
+  def self.start(argv)
+    new(argv).()
+  end
+
+  attr_reader :options, :file_map
+
+  def initialize(argv)
+    @options = self.class.default_options.merge(parse_options(argv))
+  end
+
+  def call
+    copy_nix_files
+    nixos_rebuild
+  end
+
+  def run(*cmd, sudo: false)
+    cmd.prepend("sudo") if sudo
+    puts " + #{cmd.join(' ')}"
+    status = system(*cmd)
+    unless status
+      puts "Command failed: #{cmd}"
+      exit
+    end
+  end
+
+  def all_includes_files
+    Hash.new.tap do |src_to_dst|
+      Dir.chdir(config_dir) do
+        Dir.glob(File.join("includes", "*.nix")).each do |rel_path|
+          src_to_dst[rel_path] = File.basename(rel_path)
+        end
+      end
+    end
+  end
+
+  def copy_nix_files
+    %w[configuration.nix flake.nix flake.lock].each do |file|
+      run "cp", File.join(config_dir, file), File.join(install_path, file), sudo: use_sudo
+    end
+
+    %w[includes machines pkgs].each do |dir|
+      next unless File.exist?(File.join(config_dir, dir))
+
+      run(
+        "rsync", "--archive",
+        File.join(config_dir, "#{dir}/"),
+        File.join(install_path, dir),
+        sudo: use_sudo
+      )
+    end
+  end
+
+  def nixos_rebuild
+    if upgrade
+      run "nix", "flake", "update", "--flake", install_path, sudo: use_sudo
+    end
+
+    cmd_options = ["--log-format", "bar-with-logs"]
+    cmd_options << "--build-host" << build_host if build_host
+    rebuild_cmd = ["nixos-rebuild", *cmd_options, rebuild_type]
+
+    if rebuild
+      run(*rebuild_cmd, sudo: use_sudo)
+    else
+      puts "Update flake: #{use_sudo ? '#' : '$'} nix flake update --flake #{install_path}"
+      puts "Rebuild NixOS: #{use_sudo ? '#' : '$'} #{rebuild_cmd.join(' ')}"
+    end
+
+    # capture the successful lock file if we get this far
+    copy_lock_file if rebuild
+  end
+
+  def copy_lock_file
+    run "cp", File.join(install_path, "flake.lock"), File.join(config_dir, "flake.lock")
+  end
+
+  def parse_options(argv)
+    {}.tap do |parsed|
+      OptionParser.new do |op|
+        op.on("--upgrade", "--update", "-u", "Update system flake and run nixos-rebuild with '--upgrade'") do
+          parsed[:upgrade] = true
+          parsed[:rebuild] = true
+        end
+
+        op.on("--rebuild", "-r", "Run nixos-rebuild command after installing") do
+          parsed[:rebuild] = true
+        end
+
+        op.on("--no-rebuild", "Do not rebuild nixos after installing configs. Overrides any other setting.") do
+          parsed[:rebuild] = false
+        end
+
+        op.on("--switch", "-s", "Run nixos-rebuild in 'switch' mode to immediately switch to generation after building") do
+          parsed[:rebuild] = true
+          parsed[:rebuild_type] = "switch"
+        end
+
+        op.on("--boot", "-b", "Run nixos-rebuild in 'boot' mode to build for the next boot") do
+          parsed[:rebuild] = true
+          parsed[:rebuild_type] = "boot"
+        end
+
+        op.on("--nax", "Add '--build-host nax' option to nixos-rebuild") do
+          parsed[:rebuild] = true
+          parsed[:build_host] = "nax"
+        end
+
+        op.on("--build-host=HOST", "Remote host to build nixos packages on. Defaults to empty (local).") do |host|
+          parsed[:rebuild] = true
+          parsed[:build_host] = host
+        end
+
+        op.on("-h", "--help") do
+          puts op
+          exit
+        end
+      end.parse(argv)
+    end
+  end
+
+  default_options.keys.each do |option|
+    define_method(option) { options.fetch(option) }
+    define_method("#{option}=") { |new_value| options[option] = new_value }
+  end
+end
+
+Script.new(ARGV).()
