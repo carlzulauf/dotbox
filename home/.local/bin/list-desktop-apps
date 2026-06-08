@@ -6,7 +6,7 @@ require "pathname"
 # It can be difficult to find all the *.desktop files installed.
 # This script lists them out for you along with their location.
 
-ENV["XDG_DATA_DIRS"].split(":").each do |dir|
+ENV["XDG_DATA_DIRS"].split(":").uniq.each do |dir|
   path = Pathname.new(dir).join("applications")
   desktops = path.glob("**/*.desktop")
   if desktops.any?
