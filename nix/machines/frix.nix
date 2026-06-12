@@ -1,4 +1,4 @@
-{ config, pkgs, lib, nixos-hardware, nixpkgs-master, nixpkgs-linux-7_0_5, ... }:
+{ config, pkgs, lib, nixos-hardware, nixpkgs-master, ... }:
 let
   # necessary because otherwise builds with all arch and hits OOM errors
   rocmPkgs = nixpkgs-master.rocmPackages.overrideScope (_: rprev: {
@@ -15,9 +15,8 @@ in
     scanRandMacAddress = false;
   };
 
-  # pinned to 7.0.5 — 7.0.8 regresses MT7925 bluetooth (wmt func ctrl -22)
-  boot.kernelPackages = nixpkgs-linux-7_0_5.linuxPackages_latest;
-  # nix eval github:NixOS/nixpkgs/master#linuxPackages_latest.kernel.version
+  # extra bleeding edge kernel
+  boot.kernelPackages = nixpkgs-master.linuxPackages_latest;
 
   imports =
     [

@@ -3,8 +3,6 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     nixpkgs-master.url = "github:NixOS/nixpkgs/master";
-    # pinned for frix: 7.0.8 regresses MT7925 bluetooth (wmt func ctrl -22)
-    nixpkgs-linux-7_0_5.url = "github:NixOS/nixpkgs/c6e5ca3c836a5f4dd9af9f2c1fc1c38f0fac988a";
     nixos-hardware.url = "github:NixOS/nixos-hardware/master";
     home-manager = {
       url = "github:nix-community/home-manager";
@@ -41,10 +39,6 @@
       system = "x86_64-linux";
       specialArgs = attrs // {
         nixpkgs-master = import attrs.nixpkgs-master {
-          system = "x86_64-linux";
-          config.allowUnfree = true;
-        };
-        nixpkgs-linux-7_0_5 = import attrs.nixpkgs-linux-7_0_5 {
           system = "x86_64-linux";
           config.allowUnfree = true;
         };
