@@ -27,6 +27,9 @@
   # if I'm using gnome, I want to support my peripherials I guess
   hardware.logitech.wireless.enable = true;
 
+  # open port for deskflow server
+  networking.firewall.allowedTCPPorts = [ 24800 ];
+
   services = {
     # Enable GDM display manager, the preferred one for GNOME
     displayManager.gdm = {
