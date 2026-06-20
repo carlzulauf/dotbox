@@ -98,7 +98,7 @@
       };
     };
     # package = pkgs.qbitorrent-nox; # this should already be the default
-  }
+  };
 
   # services.snapraid = {
   #   enable = true;
