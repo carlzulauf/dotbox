@@ -79,24 +79,7 @@
     enable = true;
     openFirewall = true;
     user = "carl";
-    serverConfig = {
-      LegalNotice.Accepted = true;
-      Session = {
-        DefaultSavePath = "/mnt/fountain/carl";
-        TorrentExportDirectory = "/home/carl/Downloads/torrents";
-        # Force use of wireguard vpn exclusively. Assumes wg0 network exists.
-        Interface = "wg0";
-        InterfaceName = "wg0";
-      };
-      Preferences = {
-        WebUI = {
-          Address = "*";
-          Username = "carl";
-          Password_PBKDF2 = "@ByteArray(q0IdDuWISNjAUozOHQkseg==:/NAgV7K0w2cKEDWPtkUbGLGAr2gQTzwNYQacu2UbBFpypME1UNqmn4IrdTKZnsytqvABihi3mkhdEDj+TUpKIQ==)";
-        };
-        General.Locale = "en";
-      };
-    };
+    profileDir = "/home/carl/.config/qBittorrent";
     # package = pkgs.qbitorrent-nox; # this should already be the default
   };
 
