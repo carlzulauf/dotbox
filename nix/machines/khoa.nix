@@ -24,7 +24,7 @@
 
   environment.systemPackages = with pkgs; [
     kdePackages.partitionmanager kdePackages.plasma-disks kdePackages.kate
-    qbittorrent
+    qbittorrent qbittorrent-nox
     deskflow
     # jellyfin jellyfin-ffmpeg jellyfin-web
   ];
@@ -74,6 +74,31 @@
       "subvol=/@fountain"
     ];
   };
+
+  services.qbittorrent = {
+    enable = true;
+    openFirewall = true;
+    user = "carl";
+    serverConfig = {
+      LegalNotice.Accepted = true;
+      Session = {
+        DefaultSavePath = "/mnt/fountain/carl";
+        TorrentExportDirectory = "/home/carl/Downloads/torrents";
+        # Force use of wireguard vpn exclusively. Assumes wg0 network exists.
+        Interface = "wg0";
+        InterfaceName = "wg0";
+      };
+      Preferences = {
+        WebUI = {
+          Address = "*";
+          Username = "carl";
+          Password_PBKDF2 = "@ByteArray(q0IdDuWISNjAUozOHQkseg==:/NAgV7K0w2cKEDWPtkUbGLGAr2gQTzwNYQacu2UbBFpypME1UNqmn4IrdTKZnsytqvABihi3mkhdEDj+TUpKIQ==)";
+        };
+        General.Locale = "en";
+      };
+    };
+    # package = pkgs.qbitorrent-nox; # this should already be the default
+  }
 
   # services.snapraid = {
   #   enable = true;
