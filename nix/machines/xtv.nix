@@ -1,4 +1,4 @@
-{ config, pkgs, nixos-hardware, nixpkgs-master, ... }:
+{ config, pkgs, nixos-hardware, ... }:
 
 {
   # Minisforum tv gaming machine
@@ -33,7 +33,7 @@
   time.timeZone = "America/Chicago";
 
   services.ollama = {
-    package = nixpkgs-master.ollama-rocm;
+    package = pkgs.ollama-rocm;
   };
 
   services.open-webui = {
