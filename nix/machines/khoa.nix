@@ -79,7 +79,7 @@
     enable = true;
     openFirewall = true;
     user = "carl";
-    profileDir = "/home/carl/.config/qBittorrent";
+    # profileDir = "/home/carl/.config/qBittorrent";
     # package = pkgs.qbitorrent-nox; # this should already be the default
   };
 
