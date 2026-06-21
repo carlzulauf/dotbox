@@ -2,7 +2,7 @@
 
 {
   # Minisforum tv gaming machine
-  # 6800hx + 6650m
+  # 6900hx + 6650m
   networking.hostName = "xtv";
 
   imports =
