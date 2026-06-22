@@ -91,6 +91,9 @@ in
   # Expose pkg-config files from all system packages so native gem compilation works
   environment.pathsToLink = [ "/lib/pkgconfig" ];
 
+  # enable terminfo support for ghostty/kitty/foot/etc so remote tmux sessions work
+  environment.enableAllTerminfo = true;
+
   environment.variables = rec {
     EDITOR = "micro";
 
