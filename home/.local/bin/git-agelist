@@ -94,7 +94,7 @@ class AgeList
         row[:string],
         row[:earliest] ? row[:earliest].strftime("%Y-%m-%d") : "-",
         row[:count].to_s,
-        row[:commits].join(" "),
+        hashes_cell(row[:commits]),
       ]
     end
 
@@ -107,6 +107,12 @@ class AgeList
     cells.each { |cell| lines << format_row(cell, widths) }
     lines << rule
     lines.join("\n")
+  end
+
+  # Show at most the first 4 hashes, with "..." when there are more.
+  def hashes_cell(commits)
+    shown = commits.take(4).join(" ")
+    commits.size > 4 ? "#{shown} ..." : shown
   end
 
   def format_row(cells, widths)
