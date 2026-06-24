@@ -1,0 +1,162 @@
+#!/usr/bin/env ruby
+
+# git agelist
+# -----------
+# Given a list of unique strings, find every commit in the current repo whose
+# changes touched each string (git pickaxe: `git log -S`), along with the
+# earliest date each string appeared. Results are ordered from the oldest
+# string (earliest first-seen) to the newest.
+#
+# Strings may be passed as arguments and/or piped on STDIN (one per line):
+#
+#     git agelist FEATURE_FLAG_A FEATURE_FLAG_B
+#     cat strings.txt | git agelist
+#
+# Output is an ASCII table by default, or JSON with --json.
+#
+# More info: git agelist -h
+
+require 'optparse'
+require 'json'
+require 'open3'
+require 'date'
+
+class AgeList
+  COLUMNS = ["String", "Earliest", "Commits", "Hashes"].freeze
+  ALIGN   = [:left, :left, :right, :left].freeze
+  # AGE_FMT = "%aI" # author date
+  AGE_FMT = "%cI" # committer date
+
+  attr_accessor :strings, :format, :search_all, :pickaxe
+
+  def initialize
+    @strings    = []
+    @format     = :table
+    @search_all = false
+    @pickaxe    = "-S" # literal-string pickaxe; "-G" treats strings as regexes
+  end
+
+  def perform
+    ensure_repo!
+    rows = strings.map { |string| build_row(string) }
+    rows = rows.sort_by { |row| [row[:earliest] ? 0 : 1, row[:earliest] || DateTime.new] }
+    emit(rows)
+  end
+
+  def build_row(string)
+    commits = commits_for(string)
+    {
+      string:   string,
+      earliest: commits.first && commits.first[:date],
+      count:    commits.size,
+      commits:  commits.map { |commit| commit[:short] },
+    }
+  end
+
+  # Returns the matching commits, oldest first.
+  def commits_for(string)
+    args = ["git", "log"]
+    args << "--all" if search_all
+    args << "#{pickaxe}#{string}"
+    args << "--format=%h%x09#{AGE_FMT}"
+
+    out, status = Open3.capture2(*args)
+    return [] unless status.success?
+
+    out.each_line.filter_map do |line|
+      short, iso = line.strip.split("\t", 2)
+      next if short.nil? || short.empty?
+      { short: short, date: DateTime.parse(iso) }
+    end.sort_by { |commit| commit[:date] }
+  end
+
+  def emit(rows)
+    case format
+    when :json
+      puts JSON.pretty_generate(rows.map { |row| json_row(row) })
+    else
+      puts render_table(rows)
+    end
+  end
+
+  def json_row(row)
+    {
+      "string"   => row[:string],
+      "earliest" => row[:earliest] && row[:earliest].strftime("%Y-%m-%d"),
+      "count"    => row[:count],
+      "commits"  => row[:commits],
+    }
+  end
+
+  def render_table(rows)
+    cells = rows.map do |row|
+      [
+        row[:string],
+        row[:earliest] ? row[:earliest].strftime("%Y-%m-%d") : "-",
+        row[:count].to_s,
+        row[:commits].join(" "),
+      ]
+    end
+
+    widths = COLUMNS.each_index.map do |i|
+      ([COLUMNS[i]] + cells.map { |cell| cell[i] }).map(&:length).max
+    end
+
+    rule = "+" + widths.map { |w| "-" * (w + 2) }.join("+") + "+"
+    lines = [rule, format_row(COLUMNS, widths), rule]
+    cells.each { |cell| lines << format_row(cell, widths) }
+    lines << rule
+    lines.join("\n")
+  end
+
+  def format_row(cells, widths)
+    padded = cells.each_index.map do |i|
+      ALIGN[i] == :right ? cells[i].rjust(widths[i]) : cells[i].ljust(widths[i])
+    end
+    "| " + padded.join(" | ") + " |"
+  end
+
+  def ensure_repo!
+    _out, _err, status = Open3.capture3("git", "rev-parse", "--is-inside-work-tree")
+    abort "Not inside a git repository." unless status.success?
+  end
+
+  def self.parse(args)
+    opts = new
+
+    parser = OptionParser.new do |o|
+      o.banner = "Usage: git agelist [options] STRING [STRING ...]"
+      o.separator ""
+      o.separator "Strings may also be piped on STDIN, one per line."
+      o.separator ""
+      o.separator "Options:"
+
+      o.on("-j", "--json", "Output JSON instead of an ASCII table") { opts.format = :json }
+      o.on("-a", "--all", "Search all refs (git log --all), not just HEAD") { opts.search_all = true }
+      o.on("-G", "--regex", "Treat each string as a regex (git log -G) rather than a literal") { opts.pickaxe = "-G" }
+
+      o.on("-h", "--help", "The thing you probably just ran") do
+        puts o
+        exit
+      end
+    end
+
+    parser.parse!(args)
+
+    opts.strings = args.dup
+    # Fall back to STDIN (one string per line) only when no strings were given as
+    # arguments, so passing arguments never blocks waiting on a non-tty STDIN.
+    if opts.strings.empty? && !STDIN.tty?
+      opts.strings = STDIN.read.split("\n").map(&:strip).reject(&:empty?)
+    end
+    opts.strings.uniq!
+
+    if opts.strings.empty?
+      abort "No strings given.\n\n#{parser}"
+    end
+
+    opts
+  end
+end
+
+AgeList.parse(ARGV).perform
