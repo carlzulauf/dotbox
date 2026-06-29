@@ -4,8 +4,9 @@
   environment.systemPackages = with pkgs; [
     discord
     mangohud goverlay
-    # heroic lutris # breaking 2026/04/25
+    heroic lutris
     prismlauncher
+    openrct2
   ];
 
   # additional steam setup

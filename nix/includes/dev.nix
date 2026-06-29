@@ -1,4 +1,4 @@
-{ config, pkgs, nixpkgs-master, ... }:
+{ config, pkgs, nixpkgs-master, nixpkgs-omnissa, ... }:
 let
   # # Return to zoom-us package after this PR Is merged: https://github.com/NixOS/nixpkgs/pull/397036
   # fhsZoomPkgs = import (builtins.fetchTarball {
@@ -30,8 +30,10 @@ in
 
     sql-formatter # node based command line sql format tool
 
-    # N2 VPN client
-    omnissa-horizon-client
+    # Windows VM client.
+    # Sourced from a fork pinned to the desktop-tile-font fix until it lands
+    # upstream (https://github.com/NixOS/nixpkgs); see nixpkgs-omnissa in flake.nix.
+    nixpkgs-omnissa.omnissa-horizon-client
 
     # devenv # supposed to be magic: https://devenv.sh
   ];
