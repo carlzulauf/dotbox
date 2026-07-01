@@ -107,7 +107,15 @@ in
 
     PKG_CONFIG_PATH = "/run/current-system/sw/lib/pkgconfig";
 
-    PATH = [ "${NIX_GEM_BIN}" "${NPM_CONFIG_PREFIX}/bin" ];
+    # Keep /usr/bin in the session PATH so flatpak apps work. glycin (GTK4 image
+    # loading, used by most modern flatpaks) spawns its loaders via
+    # `flatpak-spawn --sandbox`, wrapping them in a bare `prlimit` call. The
+    # nested sandbox inherits the launcher's PATH; on NixOS that PATH normally
+    # lacks /usr/bin, so `prlimit` (only present at the runtime's /usr/bin) can't
+    # be exec'd and image loads die with "Loader process exited early with
+    # status 1" (e.g. Sober/org.vinegarhq.Sober crashing on startup). Inside the
+    # sandbox /usr/bin resolves to the runtime; on the host it just holds `env`.
+    PATH = [ "${NIX_GEM_BIN}" "${NPM_CONFIG_PREFIX}/bin" "/usr/bin" ];
   };
 
   # Output list of system packages for the current generation to:
