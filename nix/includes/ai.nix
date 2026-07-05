@@ -35,7 +35,7 @@ in
     host = lib.mkDefault "0.0.0.0";
     port = 4141; # AI! AI!
     openFirewall = true;
-    package = lib.mkDefault nixpkgs-master.open-webui;
+    # package = lib.mkDefault nixpkgs-master.open-webui;
     environment = {
       ANONYMIZED_TELEMETRY = "False";
       DO_NOT_TRACK = "True";
