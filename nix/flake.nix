@@ -13,6 +13,7 @@
     llm-agents.url = "github:numtide/llm-agents.nix";
     # hermes-agent.url = "github:NousResearch/hermes-agent";
     puma-dev.url = "github:carlzulauf/puma-dev-flake";
+    ds4.url = "github:carlzulauf/ds4.nix";
     # nix-openclaw.url = "github:openclaw/nix-openclaw";
   };
 
@@ -22,6 +23,7 @@
     nixos-hardware,
     home-manager,
     puma-dev,
+    ds4,
     # hermes-agent,
     ...
   }@attrs:
@@ -56,6 +58,7 @@
         ./includes/carl.nix
         ./machines/${host}.nix
         puma-dev.nixosModules.puma-dev
+        ds4.nixosModules.ds4
         # hermes-agent.nixosModules.default
         home-manager.nixosModules.home-manager
         {
