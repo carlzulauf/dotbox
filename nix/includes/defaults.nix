@@ -62,7 +62,7 @@ in
     lm_sensors smartmontools pciutils
     btrfs-progs wireguard-tools
     micro git gh
-    fish eza file fzf starship direnv tldr
+    fish eza file fzf starship tldr
     wget curl dig sshfs
     nethogs nmap whois ethtool iw
     dysk ncdu yazi inotify-tools psmisc
@@ -83,6 +83,12 @@ in
     distrobox
     terraform
   ];
+
+  programs.direnv = {
+    enable = true;
+    enableFishIntegration = true;
+    nix-direnv.enable = true;
+  };
 
   # nix-ld provides /lib64/ld-linux-x86-64.so.2, letting FHS-compiled binaries
   # (e.g. native gem .so files built inside vscodium.fhs) run in the regular environment
