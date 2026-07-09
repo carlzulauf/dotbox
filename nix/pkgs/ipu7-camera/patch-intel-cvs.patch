@@ -1,0 +1,119 @@
+--- a/drivers/misc/icvs/intel_cvs.c	2026-07-07 22:56:13.697058207 -0500
++++ a/drivers/misc/icvs/intel_cvs.c	2026-07-08 11:45:20.466179664 -0500
+@@ -63,6 +63,59 @@
+ 	return 0;
+ }
+ 
++
++static void cvs_delayed_release(struct work_struct *work);
++
++static struct intel_cvs *cvs_get_icvs_from_dev(struct device *dev)
++{
++	struct i2c_client *i2c = to_i2c_client(dev);
++	return i2c_get_clientdata(i2c);
++}
++
++static ssize_t sensor_owner_show(struct device *dev,
++				  struct device_attribute *attr, char *buf)
++{
++	struct intel_cvs *icvs = cvs_get_icvs_from_dev(dev);
++	if (!icvs)
++		return -EINVAL;
++	if (icvs->owner == CVS_CAMERA_IPU)
++		return sysfs_emit(buf, "ipu\n");
++	else
++		return sysfs_emit(buf, "cvs\n");
++}
++
++static ssize_t sensor_owner_store(struct device *dev,
++				   struct device_attribute *attr,
++				   const char *buf, size_t count)
++{
++	struct intel_cvs *icvs = cvs_get_icvs_from_dev(dev);
++	int ret;
++
++	if (!icvs)
++		return -EINVAL;
++
++	if (sysfs_streq(buf, "ipu")) {
++		/* Cancel any pending delayed release */
++		cancel_delayed_work_sync(&icvs->delayed_release);
++		ret = cvs_acquire_camera_sensor_internal();
++		if (ret)
++			return ret;
++		icvs->icvs_sensor_state = CV_SENSOR_VISION_ACQUIRED_STATE;
++		dev_info(dev, "%s: sensor acquired by IPU", __func__);
++	} else if (sysfs_streq(buf, "cvs")) {
++		ret = cvs_release_camera_sensor_internal();
++		if (ret)
++			return ret;
++		icvs->icvs_sensor_state = CV_SENSOR_RELEASED_STATE;
++		dev_info(dev, "%s: sensor released to CVS", __func__);
++	} else {
++		return -EINVAL;
++	}
++
++	return count;
++}
++
++static DEVICE_ATTR_RW(sensor_owner);
+ static int cvs_common_probe(struct device *dev, bool is_i2c)
+ {
+ 	struct intel_cvs *icvs;
+@@ -187,6 +240,8 @@
+ 	}
+ 
+ 	icvs->icvs_sensor_state = CV_SENSOR_VISION_ACQUIRED_STATE;
++	INIT_DELAYED_WORK(&icvs->delayed_release, cvs_delayed_release);
++	schedule_delayed_work(&icvs->delayed_release, msecs_to_jiffies(10000));
+ 	acpi_dev_clear_dependencies(ACPI_COMPANION(icvs->dev));
+ 
+ exit:
+@@ -222,6 +277,10 @@
+ 		dev_info(dev, "%s (platform)\n", __func__);
+ 	}
+ 	if (icvs) {
++		/* Cancel pending delayed release and release sensor */
++		cancel_delayed_work_sync(&icvs->delayed_release);
++		if (icvs->owner == CVS_CAMERA_IPU)
++			cvs_release_camera_sensor_internal();
+ 		cvs->close_fw_dl_task = true;
+ 
+ 		if (icvs->cap == ICVS_FULLCAP) {
+@@ -370,6 +429,28 @@
+ 	return 0;
+ }
+ 
++
++static void cvs_delayed_release(struct work_struct *work)
++{
++	struct intel_cvs *icvs = container_of(work,
++		struct intel_cvs, delayed_release.work);
++
++	if (!icvs)
++		return;
++
++	dev_info(icvs->dev, "%s: Auto-releasing sensor", __func__);
++
++	/* Only release if IPU owns the sensor and refcount is 1 */
++	if (icvs->owner == CVS_CAMERA_IPU && icvs->int_ref_count == 1) {
++		int ret = cvs_release_camera_sensor_internal();
++		if (ret)
++			dev_warn(icvs->dev, "%s: Release failed: %d", __func__, ret);
++		else
++			icvs->icvs_sensor_state = CV_SENSOR_RELEASED_STATE;
++	}
++
++	dev_info(icvs->dev, "%s: Sensor released, LED should turn off", __func__);
++}
+ #ifdef DEBUG_CVS
+ enum cvs_state cvs_state;
+ int cvs_exec_cmd(enum cvs_command command)
+@@ -640,6 +721,7 @@
+ #endif
+ 	&dev_attr_cvs_ctrl_data_pre.attr,
+ 	&dev_attr_cvs_ctrl_data_fwupd.attr,
++	&dev_attr_sensor_owner.attr,
+ 	NULL,
+ };
+ ATTRIBUTE_GROUPS(cvs);

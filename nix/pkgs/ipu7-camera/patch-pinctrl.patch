@@ -1,0 +1,10 @@
+--- a/drivers/pinctrl/intel/pinctrl-intel-platform.c	2026-07-09 09:24:54.313913563 -0500
++++ b/drivers/pinctrl/intel/pinctrl-intel-platform.c	2026-07-09 09:25:15.975835428 -0500
+@@ -203,6 +203,7 @@
+ 
+ static const struct acpi_device_id intel_platform_pinctrl_acpi_match[] = {
+ 	{ "INTC105F" },
++	{ "INTC10B5" },
+ 	{ }
+ };
+ MODULE_DEVICE_TABLE(acpi, intel_platform_pinctrl_acpi_match);

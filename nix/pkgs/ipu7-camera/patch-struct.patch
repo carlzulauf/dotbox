@@ -1,0 +1,10 @@
+--- a/include/linux/intel_cvs.h	2026-07-07 22:56:13.494068053 -0500
++++ a/include/linux/intel_cvs.h	2026-07-07 22:56:13.698803539 -0500
+@@ -189,6 +189,7 @@
+ 
+ 	/* FW update info */
+ 	struct work_struct fw_dl_task;
++	struct delayed_work delayed_release;
+ 	u32 fw_update_retries;
+ 	void *fw_buffer;
+ 	u32 fw_buffer_size;

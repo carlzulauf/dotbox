@@ -308,3 +308,9 @@ Hooks can be skipped with `--no-hooks`.
 7. **Home Manager in machine configs**: Machine-specific home-manager overrides
    should be placed in the machine's `.nix` file as a `home-manager.users.carl`
    block, not in `includes/home.nix`, which is shared across all hosts.
+
+8. **No direct sudo access**: This agent **cannot run sudo commands**. If a
+   command requires root, the agent will describe what needs to be run and
+   ask you to execute it. Do not attempt to use `sudo` inside tool calls —
+   it will hang indefinitely. Always report back what command failed and
+   suggest the fix.

@@ -13,11 +13,19 @@
     ../includes/gnome-hidpi.nix
     ../includes/gnome-niri.nix
     ../includes/printing.nix
+    ../pkgs/ipu7-camera/module.nix
   ];
 
   boot.kernelPackages = pkgs.linuxPackages_latest;
   # Allow rootless containers to bind ports 80+ (needed for dokku, nginx, etc.)
   boot.kernel.sysctl."net.ipv4.ip_unprivileged_port_start" = 80;
+
+  # Add INTC10B5 pinctrl support for Dell XPS 13 9350 camera
+  # (GPIO controller needed by ov02c10 sensor driver)
+  boot.kernelPatches = [ {
+    name = "pinctrl-intel-platform-INTC10B5";
+    patch = ../pkgs/ipu7-camera/patch-pinctrl.patch;
+  } ];
 
   # these customizations should make it into nixos-hardware
   services.fwupd.enable = true;

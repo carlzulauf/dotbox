@@ -1,0 +1,40 @@
+#!/bin/sh
+# Launch Zoom with libcamera V4L2 compatibility layer for IPU7 cameras.
+#
+# The IPU7 camera on Lunar Lake doesn't expose a standard V4L2 device.
+# Instead, it uses libcamera.  This wrapper preloads libcamera's
+# v4l2-compat.so which intercepts V4L2 ioctl() calls and transparently
+# redirects them to libcamera, making the IPU7 camera appear as a
+# standard V4L2 device to Zoom.
+#
+# Usage: zoom-ipu7 [zoom-args...]
+
+set -e
+
+# Find the v4l2-compat.so from the libcamera package installed in the
+# current system.  Use the one from the system-path symlink tree so
+# we always get the version that matches the current system.
+LIBCAMERA_DIR="/run/current-system/sw/lib/libcamera"
+V4L2_COMPAT="/run/current-system/sw/libexec/libcamera/v4l2-compat.so"
+
+if [ ! -f "$V4L2_COMPAT" ]; then
+    echo "zoom-ipu7: ERROR: libcamera v4l2-compat.so not found at $V4L2_COMPAT"
+    echo "zoom-ipu7: Please ensure libcamera is installed in the system configuration."
+    exit 1
+fi
+
+# Set up the environment
+export LD_PRELOAD="${LD_PRELOAD:+$LD_PRELOAD }$V4L2_COMPAT"
+export LD_LIBRARY_PATH="${LD_LIBRARY_PATH:+$LD_LIBRARY_PATH:}$LIBCAMERA_DIR"
+export LIBCAMERA_LOG_LEVELS="V4L2Compat:0"
+
+# Enable debug logging if -d or --debug is passed
+case "${1:-}" in
+    -d|--debug)
+        export LIBCAMERA_LOG_LEVELS="0"
+        shift
+        ;;
+esac
+
+echo "zoom-ipu7: Starting Zoom with libcamera V4L2 compat preload" >&2
+exec zoom-us "$@"
