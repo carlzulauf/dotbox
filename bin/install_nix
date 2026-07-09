@@ -77,16 +77,6 @@ class Script
     end
   end
 
-  def all_includes_files
-    Hash.new.tap do |src_to_dst|
-      Dir.chdir(config_dir) do
-        Dir.glob(File.join("includes", "*.nix")).each do |rel_path|
-          src_to_dst[rel_path] = File.basename(rel_path)
-        end
-      end
-    end
-  end
-
   def copy_nix_files
     %w[configuration.nix flake.nix flake.lock].each do |file|
       run "cp", File.join(config_dir, file), File.join(install_path, file), sudo: use_sudo
