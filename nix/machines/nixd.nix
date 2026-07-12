@@ -72,46 +72,5 @@
   systemd.packages = with pkgs; [ lact ];
   systemd.services.lactd.wantedBy = ["multi-user.target"];
 
-  ## example daily timer script
-  # systemd.services."test-files" = {
-  #   script = ''
-  #     #!/bin/bash -eu
-  #     ${pkgs.ruby}/bin/ruby /home/carl/projects/dotbox-private/files/bin/files -e "list('/mnt/files/carl')"
-  #   '';
-  #   serviceConfig = {
-  #     Type = "oneshot";
-  #     User = "carl";
-  #     # ExecStart = ''/home/carl/projects/dotbox-private/files/bin/files -e "list('/mnt/files/carl')"'';
-  #   };
-  # };
-  # systemd.timers."test-files" = {
-  #   wantedBy = [ "timers.target" ];
-  #   timerConfig = {
-  #     OnCalendar = "daily";
-  #     Persistent = true;
-  #   };
-  # };
-
-  services.ollama.acceleration = "rocm";
-
-  # services.ollama = {
-  #   # package = nixpkgs-stable.legacyPackages.x86_64-linux.ollama;
-  #   acceleration = "rocm";
-  #   enable = true;
-  #   host = "0.0.0.0";
-  # };
-  # services.open-webui = {
-  #   enable = true;
-  #   host = "0.0.0.0";
-  #   port = 4141; # AI! AI!
-  #   openFirewall = true;
-  #   environment = {
-  #     ANONYMIZED_TELEMETRY = "False";
-  #     DO_NOT_TRACK = "True";
-  #     SCARF_NO_ANALYTICS = "True";
-  #     WEBUI_AUTH = "False";
-  #   };
-  # };
-
   time.timeZone = "America/Chicago";
 }
