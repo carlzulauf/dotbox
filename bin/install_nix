@@ -5,7 +5,7 @@
 # and optionally triggers a rebuild through nixos-rebuild.
 #
 # Usage (from dotbox dir):
-#   bin/install_nix [options]
+#   bin/install_nix [options] [hostname]
 #
 # Options:
 #   -s, --switch                Rebuild in 'switch' mode (active immediately)
@@ -15,6 +15,7 @@
 #       --no-rebuild            Disable rebuild (overrides other settings)
 #       --build-host=HOST       Remote builder for derivation evaluation
 #       --nax                   Shorthand for --build-host=nax
+#       --hostname              Specify machine to build (default: `hostname`)
 #   -h, --help                  Show this help message
 #
 #
@@ -99,7 +100,7 @@ class Script
       run "nix", "flake", "update", "--flake", install_path, sudo: use_sudo
     end
 
-    cmd_options = ["--log-format", "bar-with-logs"]
+    cmd_options = ["--log-format", "bar-with-logs", "--flake", "/etc/nixos##{host}"]
     cmd_options << "--build-host" << build_host if build_host
     rebuild_cmd = ["nixos-rebuild", *cmd_options, rebuild_type]
 
@@ -120,7 +121,7 @@ class Script
 
   def parse_options(argv)
     {}.tap do |parsed|
-      OptionParser.new do |op|
+      remainders = OptionParser.new do |op|
         op.on("--upgrade", "--update", "-u", "Update system flake and run nixos-rebuild with '--upgrade'") do
           parsed[:upgrade] = true
           parsed[:rebuild] = true
@@ -154,11 +155,17 @@ class Script
           parsed[:build_host] = host
         end
 
+        op.on("--hostname", "Specify which nix machine to build (defaults to current hostname).") do |name|
+          parsed[:host] = name
+        end
+
         op.on("-h", "--help") do
           puts op
           exit
         end
       end.parse(argv)
+      host = remainders.first
+      parsed[:host] = host unless host.nil? || host.empty?
     end
   end
 
@@ -168,4 +175,4 @@ class Script
   end
 end
 
-Script.new(ARGV).()
+Script.start(ARGV)
