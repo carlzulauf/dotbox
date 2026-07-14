@@ -4,7 +4,8 @@
   environment.systemPackages = with pkgs; [
     transmission_4-gtk
     gnome-secrets eog gnome-boxes gnome-sound-recorder gnome-music
-    gnome-firmware gnome-tweaks pop-gtk-theme dconf-editor
+    gnome-firmware gnome-tweaks dconf-editor
+    gnome-themes-extra pop-gtk-theme
     packagekit
 
     gnomeExtensions.appindicator
@@ -16,7 +17,15 @@
     gnomeExtensions.desktop-cube
     gnomeExtensions.paperwm
 
-    gparted resources pavucontrol
+    gparted resources
+    # pavucontrol crashes with Pop theme; wrapping with GTK_THEME=Adwaita:dark fixes it
+    (pavucontrol.overrideAttrs (old: {
+      nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ pkgs.makeWrapper ];
+      postInstall = (old.postInstall or "") + ''
+        wrapProgram $out/bin/pavucontrol \
+          --set GTK_THEME "Adwaita:dark"
+      '';
+    }))
     # gnome-session gnome-remote-desktop
     # xdg-desktop-portal xdg-desktop-portal-gnome
 
