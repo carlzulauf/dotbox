@@ -3,8 +3,9 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     nixpkgs-master.url = "github:NixOS/nixpkgs/master";
+    nixpkgs-2605.url = "github:NixOS/nixpkgs/26.05";
     # Fork pinned to the omnissa-horizon-client tile-font fix until it lands upstream.
-    nixpkgs-omnissa.url = "github:carlzulauf/nixpkgs/fix-omnissa-horizon-client-tile-fonts";
+    # nixpkgs-omnissa.url = "github:carlzulauf/nixpkgs/fix-omnissa-horizon-client-tile-fonts";
     nixos-hardware.url = "github:NixOS/nixos-hardware/master";
     home-manager = {
       url = "github:nix-community/home-manager";
@@ -46,7 +47,7 @@
           system = "x86_64-linux";
           config.allowUnfree = true;
         };
-        nixpkgs-omnissa = import attrs.nixpkgs-omnissa {
+        nixpkgs-2605 = import attrs.nixpkgs-2605 {
           system = "x86_64-linux";
           config.allowUnfree = true;
         };
