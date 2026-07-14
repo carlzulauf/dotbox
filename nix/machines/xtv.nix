@@ -46,4 +46,34 @@
   systemd.services.gnome-remote-desktop = {
     wantedBy = [ "graphical.target" ];
   };
+
+  # ──────────────────────────────────────────────────────────────────
+  # Audio: prefer HDMI/DisplayPort over S/PDIF as default output
+  # ──────────────────────────────────────────────────────────────────
+  # The Navi 21/23 HDMI/DP Audio Controller has priority.session=696,
+  # while the USB S/PDIF adapter (Unitek Y-247A) has 1108.  When
+  # Bluetooth headphones disconnect, WirePlumber's default-node
+  # selection picks the highest-priority available sink, so S/PDIF
+  # wins even though HDMI is the preferred output.
+  #
+  # This WirePlumber config bumps HDMI's priority above S/PDIF so
+  # the HDMI output is always selected as the fallback default.
+  services.pipewire.wireplumber.configPackages = [
+    (pkgs.writeTextDir "share/wireplumber/wireplumber.conf.d/10-prefer-hdmi-audio.conf" ''
+      monitor.alsa.rules = [
+        {
+          matches = [
+            {
+              node.name = "~alsa_output.pci-0000_03_00.1.hdmi-stereo"
+            }
+          ]
+          actions = {
+            update-props = {
+              priority.session = 2000
+            }
+          }
+        }
+      ]
+    '')
+  ];
 }
