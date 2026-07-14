@@ -1,4 +1,4 @@
-{ config, pkgs, nixpkgs-master, home-manager, ... }:
+{ config, pkgs, nixpkgs-2605, home-manager, ... }:
 
 {
   environment.systemPackages = with pkgs; [
@@ -9,7 +9,8 @@
     # trying some matrix clients
     element-desktop fractal
     keepassxc
-    vlc handbrake audacity
+    # vlc handbrake audacity
+    vlc nixpkgs-2605.handbrake audacity
     playerctl
     flatpak appimage-run
     ventoy
