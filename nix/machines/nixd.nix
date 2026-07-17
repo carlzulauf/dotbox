@@ -53,13 +53,16 @@
 
   # From https://nixos.wiki/wiki/AMD_GPU
   # "Make the kernel use the correct driver early"
-  boot.initrd.kernelModules = [ "amdgpu" ];
+  boot.initrd.kernelModules = [ "amdgpu" ];  
 
   # allow manual power/speed control
   hardware.amdgpu.overdrive.enable = true;
   programs.corectrl.enable = true;
 
   services.displayManager.gdm.autoSuspend = false;
+
+  # box is mostly for agent use and we want it to have full access, so ditch sudo passwords
+  security.sudo.wheelNeedsPassword = false;
 
   # hardware.graphics = {
   #   enable = true;       #--> Might not be needed
