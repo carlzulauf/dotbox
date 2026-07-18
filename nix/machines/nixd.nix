@@ -70,6 +70,12 @@
   #   extraPackages = with pkgs; [ rocmPackages.clr.icd ]; # OpenCL
   # };
 
+  services.open-webui = {
+    environment = {
+      WEBUI_AUTH = "False";
+    };
+  };
+
   environment.systemPackages = with pkgs; [
     lact # control amdgpu
     # clinfo # verify OpenCL
