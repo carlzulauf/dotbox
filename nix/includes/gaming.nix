@@ -3,7 +3,7 @@
 {
   environment.systemPackages = with pkgs; [
     discord
-    mangohud goverlay
+    mangohud goverlay gamemode
     heroic lutris
     prismlauncher
     openrct2
