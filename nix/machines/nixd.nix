@@ -59,6 +59,8 @@
   hardware.amdgpu.overdrive.enable = true;
   programs.corectrl.enable = true;
 
+  services.displayManager.gdm.autoSuspend = false;
+
   # hardware.graphics = {
   #   enable = true;       #--> Might not be needed
   #   enable32Bit = true;  # /
