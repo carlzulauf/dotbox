@@ -8,7 +8,7 @@
     [
       nixos-hardware.nixosModules.common-cpu-amd
       nixos-hardware.nixosModules.common-cpu-amd-pstate
-      # nixos-hardware.nixosModules.common-cpu-amd-zenpower # failing 3/26/2025
+      nixos-hardware.nixosModules.common-cpu-amd-zenpower
       nixos-hardware.nixosModules.common-gpu-amd
       ../includes/ai.nix
       ../includes/gui.nix
@@ -53,7 +53,7 @@
 
   # From https://nixos.wiki/wiki/AMD_GPU
   # "Make the kernel use the correct driver early"
-  boot.initrd.kernelModules = [ "amdgpu" ];  
+  boot.initrd.kernelModules = [ "amdgpu" ];
 
   # allow manual power/speed control
   hardware.amdgpu.overdrive.enable = true;
