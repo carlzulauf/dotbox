@@ -64,11 +64,11 @@
   # box is mostly for agent use and we want it to have full access, so ditch sudo passwords
   security.sudo.wheelNeedsPassword = false;
 
-  # hardware.graphics = {
-  #   enable = true;       #--> Might not be needed
-  #   enable32Bit = true;  # /
-  #   extraPackages = with pkgs; [ rocmPackages.clr.icd ]; # OpenCL
-  # };
+  hardware.graphics = {
+    enable = true;
+    enable32Bit = true;
+    extraPackages = with pkgs; [ vulkan-tools ];
+  };
 
   services.open-webui = {
     environment = {
@@ -78,7 +78,7 @@
 
   environment.systemPackages = with pkgs; [
     lact # control amdgpu
-    # clinfo # verify OpenCL
+    vulkan-tools # vulkaninfo for GPU debugging
   ];
   systemd.packages = with pkgs; [ lact ];
   systemd.services.lactd.wantedBy = ["multi-user.target"];

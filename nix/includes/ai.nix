@@ -27,7 +27,7 @@ in
     enable = lib.mkDefault true;
     host = lib.mkDefault "0.0.0.0";
     openFirewall = true;
-    package = lib.mkDefault nixpkgs-master.ollama;
+    package = lib.mkDefault nixpkgs-master.ollama-vulkan;
   };
 
   services.open-webui = {
