@@ -39,6 +39,11 @@
   # open port for deskflow server
   networking.firewall.allowedTCPPorts = [ 24800 ];
 
+  programs.kdeconnect = {
+    enable = true;
+    package = pkgs.gnomeExtensions.gsconnect;
+  };
+
   services = {
     # Enable GDM display manager, the preferred one for GNOME
     displayManager.gdm = {
