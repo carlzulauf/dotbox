@@ -333,9 +333,13 @@ class InstallDotfiles < Struct.new(:options)
         end
       end
     elsif dest.exist?
-      change("⇄", src, dest) do
-        backup_existing_file(dest)
-        create_symlink.()
+      if optional
+        change("∅", src, dest) # do nothing
+      else
+        change("⇄", src, dest) do
+          backup_existing_file(dest)
+          create_symlink.()
+        end
       end
     else
       if optional && !dest.dirname.exist?
