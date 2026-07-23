@@ -30,6 +30,7 @@
   }@attrs:
   let
     activeHosts = [
+      "generic" # Base host for initial installs (no hardware-specific config)
       "frix" # Framework Desktop
       "enix" # HP Envy Laptop
       "khoa" # torrent station
@@ -77,8 +78,24 @@
         })
       ];
     };
+    mkIso = nixpkgs.lib.nixosSystem {
+      system = "x86_64-linux";
+      specialArgs = attrs // {
+        nixpkgs-master = import attrs.nixpkgs-master {
+          system = "x86_64-linux";
+          config.allowUnfree = true;
+        };
+        nixpkgs-2605 = import attrs.nixpkgs-2605 {
+          system = "x86_64-linux";
+          config.allowUnfree = true;
+        };
+      };
+      modules = [ ./iso.nix ];
+    };
   in
   {
-    nixosConfigurations = nixpkgs.lib.genAttrs activeHosts mkHost;
+    nixosConfigurations = nixpkgs.lib.genAttrs activeHosts mkHost // {
+      iso = mkIso;
+    };
   };
 }
