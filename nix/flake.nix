@@ -62,14 +62,19 @@
         ds4.nixosModules.ds4
         # hermes-agent.nixosModules.default
         home-manager.nixosModules.home-manager
-        {
+        ({ config, ... }: {
           home-manager.useGlobalPkgs = true;
           home-manager.useUserPackages = true;
           home-manager.sharedModules = [
             # nix-openclaw.homeManagerModules.openclaw
           ];
-          home-manager.users.carl = ./includes/home.nix;
-        }
+          home-manager.extraSpecialArgs = let
+            guiEnabled = config.dotbox.gui.enable;
+          in {
+            inherit guiEnabled;
+          };
+          home-manager.users.carl = ./includes/home-manager.nix;
+        })
       ];
     };
   in

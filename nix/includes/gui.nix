@@ -1,6 +1,9 @@
-{ config, pkgs, nixpkgs-2605, home-manager, ... }:
+{ config, pkgs, lib, nixpkgs-2605, ... }:
 
 {
+  # Signal to home-manager that GUI apps should be installed
+  dotbox.gui.enable = true;
+
   environment.systemPackages = with pkgs; [
     firefox firefox-devedition
     google-chrome chromium brave
@@ -16,26 +19,6 @@
     ventoy
     cpu-x
   ];
-
-  home-manager.users.carl = { ... }: {
-    programs.vscodium = {
-      enable = true;
-      # Allow runtime installation of extensions, and give extensions like ruby-lsp a reasonable build environment
-      package = pkgs.vscodium.fhsWithPackages (p: with p; [
-        gcc gnumake
-        libyaml
-      ]);
-      profiles.default = {
-        extensions = with pkgs.vscode-extensions; [
-          continue.continue
-          jnoortheen.nix-ide
-          # anthropic.claude-code
-          shopify.ruby-lsp
-          # BriteSnow.vscode-toggle-quotes # not supported for some reason
-        ];
-      };
-    };
-  };
 
   # maybe this will go away some day soon. wayland is pretty decent now.
   services.xserver = {
