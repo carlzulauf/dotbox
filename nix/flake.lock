@@ -39,11 +39,11 @@
         "nixpkgs": "nixpkgs"
       },
       "locked": {
-        "lastModified": 1784773421,
-        "narHash": "sha256-H1z4vVCARZLWs+KCIyPha/n/kyj8LYX5aSQerjLe4v8=",
+        "lastModified": 1783646629,
+        "narHash": "sha256-V95YIg5qL4trHNy0Bv6+2uwvKmArWcaXUADMNt6BtvE=",
         "owner": "carlzulauf",
         "repo": "ds4.nix",
-        "rev": "a730892321befbd101669b5cf4192cfc50a5deae",
+        "rev": "e5c2bd95a444f39a2d3d2355810797532c95f6e8",
         "type": "github"
       },
       "original": {
