@@ -24,4 +24,20 @@
       "<% $0 %>",
     ]
   },
+  "Ruby Do Block": {
+    "prefix": "do",
+    "body": [
+      "<% ${1:expr} do %>",
+      "  $0",
+      "<% end %>"
+    ]
+  },
+  "Ruby if Block": {
+    "prefix": "if",
+    "body": [
+      "<% if ${1:cond} %>",
+      "  $0",
+      "<% end %>"
+    ]
+  },
 }
