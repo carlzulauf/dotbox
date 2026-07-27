@@ -158,7 +158,6 @@ home-manager with ./includes/home.nix for user carl
 |-------|---------|
 | `nixpkgs` (nixos-unstable) | Primary package set |
 | `nixpkgs-master` (master) | Bleeding-edge packages (claude-code, pi, opencode, etc.) |
-| `nixpkgs-2605` (26.05) | Stable pin for packages that need it (handbrake) |
 | `nixos-hardware` | Hardware-specific NixOS modules |
 | `home-manager` | Per-user config management (tmux, vscodium) |
 | `llm-agents` | claude-code, pi, opencode, agent-browser packages |
@@ -172,7 +171,6 @@ upstream, no longer needed), `hermes-agent`, `nix-openclaw`.
 
 Every machine config receives these extra arguments:
 - `nixpkgs-master` — imported with `allowUnfree = true`
-- `nixpkgs-2605` — imported with `allowUnfree = true`
 - `llm-agents` — `llm-agents.packages.x86_64-linux`
 
 ### Host-specific includes
@@ -210,8 +208,6 @@ like continue.continue and shopify.ruby-lsp.
 
 - **`nixpkgs-master`** is passed as a `specialArg` to every machine config,
   giving access to bleeding-edge packages (e.g., `nixpkgs-master.claude-code`).
-- **`nixpkgs-2605`** is a stable pin (26.05) used where master is too volatile
-  (e.g., `gui.nix` pulls `handbrake` from it).
 - **`llm-agents`** provides claude-code, pi, opencode, agent-browser.
 - `nixpkgs-omnissa` input has been removed — the omnissa-horizon-client tile-font
   fix landed upstream, so it now comes from regular `pkgs`.

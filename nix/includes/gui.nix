@@ -1,4 +1,4 @@
-{ config, pkgs, lib, nixpkgs-2605, ... }:
+{ config, pkgs, lib, ... }:
 
 {
   # Signal to home-manager that GUI apps should be installed
@@ -13,7 +13,7 @@
     element-desktop fractal
     keepassxc
     # vlc handbrake audacity
-    vlc nixpkgs-2605.handbrake audacity
+    vlc handbrake audacity
     playerctl
     flatpak appimage-run
     ventoy
