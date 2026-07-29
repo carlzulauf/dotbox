@@ -1,10 +1,13 @@
 # This niri config is expected to live alongside gnome and use GDM.
 # It may work elsewhere, but the assumption is there will be problems.
-{ config, lib, pkgs, ... }:
+{ config, lib, pkgs, nixpkgs-master, ... }:
 
 {
   # --- Niri (alongside GNOME, selectable at GDM) ---
-  programs.niri.enable = true;
+  programs.niri = {
+    enable = true;
+    package = nixpkgs-master.niri; # unstable broken 2026-07-28
+  };
   programs.xwayland.enable = true;
 
   # PAM entry for swaylock (not provided by nixpkgs niri module)
