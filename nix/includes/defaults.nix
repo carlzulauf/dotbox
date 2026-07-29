@@ -27,7 +27,6 @@ in
         "beekeeper-studio"
         "ventoy"
         "mbedtls"
-        "openclaw"
       ];
     };
 
@@ -81,9 +80,6 @@ in
       ffmpeg imagemagick
       sops age
       sqlite jq yq lbzip2 p7zip cdrtools
-      (ruby_4_0.withPackages (ps: with ps; [
-        pry ruby-lsp
-      ]))
       gcc gnumake pkg-config libyaml.dev
       python3
       nodejs
@@ -93,6 +89,11 @@ in
       docker-compose
       distrobox
       terraform
+
+      nixpkgs-master.claude-code
+      # nixpkgs-master.opencode
+      nixpkgs-master.pi-coding-agent
+      nixpkgs-master.agent-browser
     ];
 
     programs.direnv = {

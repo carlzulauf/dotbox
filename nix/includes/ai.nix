@@ -14,13 +14,6 @@ in
     intel-gpu-tools
 
     nixpkgs-master.llmfit
-    # nixpkgs-master.claude-code
-    # nixpkgs-master.pi-coding-agent
-    # nixpkgs-master.opencode
-    llm-agents.claude-code
-    llm-agents.pi
-    llm-agents.opencode
-    llm-agents.agent-browser
   ];
 
   services.ollama = {

@@ -13,25 +13,16 @@ in
   environment.systemPackages = with pkgs; [
     sakura alacritty ghostty
     pulsar slack
-    #fhsZoomPkgs.zoom-us
     zoom-us
-    libreoffice # breaking on fonts dependency 2026/03/01
+    libreoffice
     insomnia
 
-    nixpkgs-master.claude-code
-    nixpkgs-master.opencode
-    nixpkgs-master.pi-coding-agent
-    gh # github CLI
-
     # trying out some SQL GUIs
-    sequeler
-    beekeeper-studio
-    dbeaver-bin
+    sequeler beekeeper-studio dbeaver-bin
 
     sql-formatter # node based command line sql format tool
 
     omnissa-horizon-client
-
     # devenv # supposed to be magic: https://devenv.sh
   ];
 }

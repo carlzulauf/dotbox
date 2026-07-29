@@ -13,7 +13,6 @@
       ../includes/ai.nix
       ../includes/gui.nix
       ../includes/gnome.nix
-      ../includes/dev.nix
       ../includes/gaming.nix
       ../includes/printing.nix
     ];
