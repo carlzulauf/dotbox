@@ -1,4 +1,4 @@
-format = '$username$hostname$custom in $localip$shlvl$singularity$kubernetes$directory$vcsh$git_branch$git_commit$git_state$git_metrics$git_status$hg_branch$docker_context$package$bun$c$cmake$cobol$daml$dart$deno$dotnet$elixir$elm$erlang$golang$haskell$helm$java$julia$kotlin$lua$nim$nodejs$ocaml$perl$php$pulumi$purescript$python$raku$rlang$red$ruby$rust$scala$swift$terraform$vlang$vagrant$zig$buf$nix_shell$conda$meson$spack$memory_usage$env_var$crystal$sudo$cmd_duration$line_break$jobs$battery$time$status$shell$character'
+format = '$username$hostname$custom in $localip$shlvl$singularity$kubernetes$directory$vcsh$git_branch$git_commit$git_state$git_metrics$git_status$hg_branch$docker_context$package$bun$c$cmake$cobol$daml$dart$deno$dotnet$elixir$elm$erlang$golang$haskell$helm$java$julia$kotlin$lua$nim$nodejs$ocaml$perl$php$pulumi$purescript$python$raku$rlang$red$ruby$rust$scala$swift$terraform$vlang$vagrant$zig$buf$nix_shell$conda$meson$spack$memory_usage$env_var$crystal$sudo$cmd_duration$time$line_break$jobs$battery$status$shell$character'
 ## FIRST LINE/ROW: Info & Status
 # First param ─┌
 [username]
@@ -40,7 +40,7 @@ deleted = "x"
 # Last param in the first line/row
 [cmd_duration]
 min_time = 1
-format = "took [$duration]($style)"
+format = "[$duration]($style)"
 disabled = false
 
 
@@ -69,10 +69,10 @@ disabled = true
 
 # Prompt: optional param 1
 [time]
-format = " 🕙 $time($style)\n"
+format = "  \\[$time($style)\\]"
 time_format = "%T"
 style = "bright-white"
-disabled = true
+disabled = false
 
 # Prompt: param 2 └─
 [character]
