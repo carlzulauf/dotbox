@@ -26,7 +26,6 @@
       nixos-hardware.nixosModules.common-cpu-amd-zenpower
       nixos-hardware.nixosModules.common-gpu-amd
       ../includes/gui.nix
-      ../includes/dev.nix
       ../includes/printing.nix
     ];
 
@@ -49,9 +48,7 @@
     prismlauncher # minecraft
     iio-niri # manually started by niri config
 
-    nixpkgs-master.claude-code
-    nixpkgs-master.opencode
-    nixpkgs-master.pi-coding-agent
+    slack zoom-us
   ];
 
   hardware.steam-hardware.enable = true;
