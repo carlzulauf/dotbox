@@ -1,18 +1,32 @@
 # system flake file
 {
   inputs = {
+    # primary channel
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+
+    # used to keep a few tools on the bleeding edge, and
+    #  as an escape hatch when an unstable pkg is broken
     nixpkgs-master.url = "github:NixOS/nixpkgs/master";
+
+    # used for better per-machine hardware support
     nixos-hardware.url = "github:NixOS/nixos-hardware/master";
+
+    # dotfiles are managed in this repo, but not by home-manager
+    # home-manager mostly for installing some tools as user
     home-manager = {
       url = "github:nix-community/home-manager";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+
+    # gem some LLM tools from this repo instead
     llm-agents.url = "github:numtide/llm-agents.nix";
-    # hermes-agent.url = "github:NousResearch/hermes-agent";
+
+    # reverse proxy that sets up per app subdomains on
+    #  port 80/443 with SSL for locally running apps (ie: dev)
     puma-dev.url = "github:carlzulauf/puma-dev-flake";
+
+    # Nix flake for DwarfStar, model runner for DeepSeek V4 Flash/Pro
     ds4.url = "github:carlzulauf/ds4.nix";
-    # nix-openclaw.url = "github:openclaw/nix-openclaw";
   };
 
   outputs = {
@@ -22,7 +36,6 @@
     home-manager,
     puma-dev,
     ds4,
-    # hermes-agent,
     ...
   }@attrs:
   let
