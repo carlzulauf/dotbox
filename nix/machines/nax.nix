@@ -17,7 +17,6 @@
       ../includes/ai.nix
       ../includes/gui.nix
       ../includes/tv.nix
-      ..
     ];
 
   environment.systemPackages = with pkgs; [
