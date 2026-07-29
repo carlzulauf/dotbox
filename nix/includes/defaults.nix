@@ -71,7 +71,8 @@ in
       kpcli # keepass CLI
       lm_sensors smartmontools pciutils
       btrfs-progs wireguard-tools
-      micro git gh
+      nano micro vim
+      git git-absorb lazygit tig gh
       fish eza file fzf starship tldr
       wget curl dig sshfs
       nethogs nmap whois ethtool iw
