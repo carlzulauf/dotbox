@@ -26,11 +26,21 @@
       nixos-hardware.nixosModules.common-cpu-amd-zenpower
       nixos-hardware.nixosModules.common-gpu-amd
       ../includes/gui.nix
-      ../includes/gnome.nix
-      ../includes/gnome-niri.nix
       ../includes/dev.nix
       ../includes/printing.nix
     ];
+
+  # Enable the COSMIC login manager
+  services.displayManager.cosmic-greeter.enable = true;
+
+  # Enable the COSMIC desktop environment
+  services.desktopManager.cosmic.enable = true;
+  {
+    programs.firefox.preferences = {
+      # disable libadwaita theming for Firefox
+      "widget.gtk.libadwaita-colors.enabled" = false;
+    };
+  }
 
   environment.systemPackages = with pkgs; [
     ryzenadj
