@@ -29,7 +29,6 @@ in
       ../includes/ai.nix
       ../includes/gui.nix
       ../includes/gnome.nix
-      ../includes/gnome-hidpi.nix
       ../includes/gnome-niri.nix
       ../includes/dev.nix
       ../includes/printing.nix
