@@ -10,8 +10,6 @@
     ../includes/ai.nix
     ../includes/gaming.nix
     ../includes/gnome.nix
-    ../includes/gnome-hidpi.nix
-    ../includes/gnome-niri.nix
     ../includes/printing.nix
   ];
 
