@@ -34,12 +34,10 @@
 
   # Enable the COSMIC desktop environment
   services.desktopManager.cosmic.enable = true;
-  {
-    programs.firefox.preferences = {
-      # disable libadwaita theming for Firefox
-      "widget.gtk.libadwaita-colors.enabled" = false;
-    };
-  }
+  programs.firefox.preferences = {
+    # disable libadwaita theming for Firefox
+    "widget.gtk.libadwaita-colors.enabled" = false;
+  };
 
   environment.systemPackages = with pkgs; [
     ryzenadj
