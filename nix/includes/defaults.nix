@@ -83,6 +83,7 @@ in
       gcc gnumake pkg-config libyaml.dev
       python3
       nodejs
+      ruby_4_0
 
       syncthing tailscale
 
