@@ -29,7 +29,7 @@ in
       ../includes/ai.nix
       ../includes/gui.nix
       ../includes/gnome.nix
-      ../includes/gnome-niri.nix
+      ../includes/gnome-cosmic.nix
       ../includes/dev.nix
       ../includes/printing.nix
     ];
