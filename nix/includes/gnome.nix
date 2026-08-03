@@ -5,7 +5,7 @@
     transmission_4-gtk
     gnome-secrets eog gnome-boxes gnome-sound-recorder gnome-music
     gnome-firmware gnome-tweaks dconf-editor
-    gnome-themes-extra pop-gtk-theme
+    gnome-themes-extra
     packagekit
 
     gnomeExtensions.appindicator
