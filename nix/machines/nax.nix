@@ -23,15 +23,6 @@
     nvtopPackages.amd
   ];
 
-  # TEMPORARY (2026-08-03): force one full offline e2fsck of / after the
-  # unclean shutdown at 09:50. The root fs has not had a full check since it
-  # was created (Nov 2024). `repair=yes` is required on a headless box --
-  # default `preen` mode aborts to an emergency shell on anything it won't
-  # auto-fix, which would leave nax unreachable. Results land in the journal:
-  #   journalctl -b 0 | grep systemd-fsck
-  # REMOVE THESE TWO PARAMS AND REBUILD once the check comes back clean.
-  boot.kernelParams = [ "fsck.mode=force" "fsck.repair=yes" ];
-
   # nix.settings.substituters = [ "http://nax/" ];
 
   # lsblk --output NAME,SIZE,TYPE,MOUNTPOINTS,UUID
