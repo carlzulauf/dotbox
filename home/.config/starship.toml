@@ -43,6 +43,10 @@ min_time = 1
 format = "[$duration]($style)"
 disabled = false
 
+[nix_shell]
+format = '[$symbol$state]($style)'
+impure_msg = 'nix '
+symbol = " "
 
 ## SECOND LINE/ROW: Prompt
 # Somethere at the beginning
@@ -122,11 +126,9 @@ symbol = " "
 [nim]
 symbol = " "
 
-[nix_shell]
-symbol = " "
-
 [nodejs]
 symbol = " "
+disabled = true
 
 [package]
 symbol = " "
