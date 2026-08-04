@@ -72,7 +72,8 @@ in
       btrfs-progs wireguard-tools
       nano micro vim
       git git-absorb lazygit tig gh
-      fish eza file fzf starship tldr
+      tmux fish
+      eza file fzf starship tldr
       wget curl dig sshfs
       nethogs nmap whois ethtool iw
       dysk ncdu yazi inotify-tools psmisc

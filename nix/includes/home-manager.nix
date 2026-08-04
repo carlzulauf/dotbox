@@ -5,10 +5,6 @@
   home.username = "carl";
   home.homeDirectory = "/home/carl";
 
-  programs.tmux = {
-    enable = true;
-  };
-
   # Only enable GUI apps (like vscodium) on machines that opt in (e.g., those with gui.nix)
   programs.vscodium = lib.mkIf guiEnabled {
     enable = true;
