@@ -40,7 +40,7 @@ deleted = "x"
 # Last param in the first line/row
 [cmd_duration]
 min_time = 1
-format = "[$duration]($style)"
+format = " [$duration]($style)"
 disabled = false
 
 [nix_shell]
@@ -110,6 +110,7 @@ symbol = " "
 
 [git_branch]
 symbol = " "
+format = "[$symbol$branch]($style)"
 
 [golang]
 symbol = " "
