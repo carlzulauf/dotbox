@@ -11,13 +11,6 @@
     # used for better per-machine hardware support
     nixos-hardware.url = "github:NixOS/nixos-hardware/master";
 
-    # dotfiles are managed in this repo, but not by home-manager
-    # home-manager mostly for installing some tools as user
-    home-manager = {
-      url = "github:nix-community/home-manager";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
-
     # gem some LLM tools from this repo instead
     llm-agents.url = "github:numtide/llm-agents.nix";
 
@@ -33,7 +26,6 @@
     self,
     nixpkgs,
     nixos-hardware,
-    home-manager,
     puma-dev,
     ds4,
     ...
@@ -67,21 +59,6 @@
         ./machines/${host}.nix
         puma-dev.nixosModules.puma-dev
         ds4.nixosModules.ds4
-        # hermes-agent.nixosModules.default
-        home-manager.nixosModules.home-manager
-        ({ config, ... }: {
-          home-manager.useGlobalPkgs = true;
-          home-manager.useUserPackages = true;
-          home-manager.sharedModules = [
-            # nix-openclaw.homeManagerModules.openclaw
-          ];
-          home-manager.extraSpecialArgs = let
-            guiEnabled = config.dotbox.gui.enable;
-          in {
-            inherit guiEnabled;
-          };
-          home-manager.users.carl = ./includes/home-manager.nix;
-        })
       ];
     };
     mkIso = nixpkgs.lib.nixosSystem {

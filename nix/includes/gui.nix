@@ -1,9 +1,6 @@
 { config, pkgs, lib, ... }:
 
 {
-  # Signal to home-manager that GUI apps should be installed
-  dotbox.gui.enable = true;
-
   environment.systemPackages = with pkgs; [
     firefox firefox-devedition
     google-chrome chromium brave
@@ -18,6 +15,15 @@
     flatpak appimage-run
     ventoy
     cpu-x
+    vscodium
+    (vscode-with-extensions.override {
+      vscode = vscodium;
+      vscodeExtensions = with vscode-extensions; [
+        continue.continue
+        jnoortheen.nix-ide
+        shopify.ruby-lsp
+      ];
+    })
   ];
 
   # maybe this will go away some day soon. wayland is pretty decent now.

@@ -8,15 +8,6 @@ let
   # };
 in
 {
-  options = {
-    # Declare options so they can be set by includes and read by home-manager
-    dotbox.gui.enable = lib.mkOption {
-      type = lib.types.bool;
-      default = false;
-      description = "Whether to enable GUI apps via home-manager on this machine.";
-    };
-  };
-
   config = {
     nixpkgs.config = {
       allowUnfree = true;
