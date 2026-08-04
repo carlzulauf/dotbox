@@ -27,37 +27,16 @@
       nixos-hardware.nixosModules.common-gpu-amd
       ../includes/gui.nix
       ../includes/printing.nix
+      ../includes/gnome.nix
+      ../includes/gnome-cosmic.nix
     ];
-
-  # Enable the COSMIC login manager
-  services.displayManager.cosmic-greeter.enable = true;
-
-  # Enable the COSMIC desktop environment
-  services.desktopManager.cosmic.enable = true;
-  programs.firefox.preferences = {
-    # disable libadwaita theming for Firefox
-    "widget.gtk.libadwaita-colors.enabled" = false;
-  };
 
   environment.systemPackages = with pkgs; [
     ryzenadj
     discord
     wavemon # ncurses wifi monitor
-    prismlauncher # minecraft
-    iio-niri # manually started by niri config
-
     slack zoom-us
   ];
-
-  hardware.steam-hardware.enable = true;
-  programs.steam = {
-    enable = true;
-    remotePlay.openFirewall = true;
-    dedicatedServer.openFirewall = true;
-    localNetworkGameTransfers.openFirewall = true;
-    gamescopeSession.enable = true;
-    protontricks.enable = true;
-  };
 
   services.fwupd.enable = true;
 
