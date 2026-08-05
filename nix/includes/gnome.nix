@@ -18,19 +18,23 @@
     gnomeExtensions.paperwm
 
     gparted resources
-    # pavucontrol crashes with Pop theme; wrapping with GTK_THEME=Adwaita:dark fixes it
-    (pavucontrol.overrideAttrs (old: {
-      nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ pkgs.makeWrapper ];
-      postInstall = (old.postInstall or "") + ''
-        wrapProgram $out/bin/pavucontrol \
-          --set GTK_THEME "Adwaita:dark"
-      '';
-    }))
-    # gnome-session gnome-remote-desktop
-    # xdg-desktop-portal xdg-desktop-portal-gnome
 
+    pavucontrol # advanced audio device control GUI
     solaar # logitech control
     deskflow # open source synergy w/wayland support
+  ];
+
+  # Dark theme defaults. color-scheme is what libadwaita/GTK4 apps (and Electron
+  # apps via the xdg portal) follow, but GTK3 client-side decorations ignore it,
+  # so gtk-theme has to name a dark theme explicitly or Slack et al. get a light
+  # titlebar. Adwaita-dark comes from gnome-themes-extra above
+  programs.dconf.profiles.user.databases = [
+    {
+      settings."org/gnome/desktop/interface" = {
+        color-scheme = "prefer-dark";
+        gtk-theme = "Adwaita-dark";
+      };
+    }
   ];
 
   # if I'm using gnome, I want to support my peripherials I guess
