@@ -111,7 +111,7 @@ symbol = " "
 
 [git_branch]
 symbol = " "
-format = " [$symbol$branch]($style)"
+format = " [$symbol$branch]($style) "
 
 [golang]
 symbol = " "
