@@ -14,7 +14,6 @@
     gnomeExtensions.freon
     gnomeExtensions.screen-rotate
     gnomeExtensions.clipboard-history
-    gnomeExtensions.desktop-cube
     gnomeExtensions.paperwm
 
     gparted resources
