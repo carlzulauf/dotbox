@@ -21,6 +21,7 @@
 
   environment.systemPackages = with pkgs; [
     nvtopPackages.amd
+    file # signal-decode-v2 identifies decrypted attachments with it
   ];
 
   # nix.settings.substituters = [ "http://nax/" ];
@@ -146,18 +147,23 @@
     };
   };
 
-  systemd.services."signal-decode" = {
-    script = "ruby /home/carl/projects/scratch/rb/signal_decode_cronjob.rb";
+  # Decodes the folder-format Signal backups (backup v2) that syncthing brings
+  # over from the phone. Replaces the old signal-decode job: Signal's 8.x
+  # on-device backup upgrade retired the single-file .backup format, and with it
+  # the signal-decode binary that job depended on.
+  systemd.services."signal-decode-v2" = {
+    script = "ruby /home/carl/projects/scratch/rb/signal_v2_decode_cronjob.rb";
     serviceConfig = {
       Type = "oneshot";
       User = "carl";
     };
     environment = {
-      GEM_HOME = "/home/carl/.local/share/gems/nix";
+      # mkForce needed to take precedence over default systemd PATH value.
+      # Needs ruby, plus file(1) to identify decrypted attachments.
       PATH = pkgs.lib.mkForce "/run/current-system/sw/bin:/home/carl/.local/bin";
     };
   };
-  systemd.timers."signal-decode" = {
+  systemd.timers."signal-decode-v2" = {
     wantedBy = [ "timers.target" ];
     timerConfig = {
       OnCalendar = "*-*-* 05:00:00";
