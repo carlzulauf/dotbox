@@ -36,14 +36,14 @@ dotbox/
 │   │   ├── dev.nix         # Dev tools (editors, SQL clients, zoom)
 │   │   ├── gui.nix         # GUI apps, browsers, flatpak, vscodium
 │   │   ├── gnome.nix       # GNOME desktop, extensions, libvirtd
-│   │   ├── gnome-hidpi.nix # HiDPI / fractional scaling for GNOME
-│   │   ├── gnome-niri.nix  # Niri compositor integration
-│   │   ├── ai.nix          # Ollama, Open WebUI, LLM agents
+│   │   ├── gnome-cosmic.nix # Cosmic desktop alongside GNOME (selectable at GDM)
+│   │   ├── gnome-niri.nix  # Niri compositor alongside GNOME — UNUSED, no host imports it
+│   │   ├── ai.nix          # Ollama, Open WebUI
 │   │   ├── gaming.nix      # Steam, discord, lutris, gamescope
 │   │   ├── printing.nix    # CUPS + Brother laser printer drivers
-│   │   ├── tv.nix          # TV/media machine config (idle-blank workaround, cockpit)
-│   │   └── home.nix        # Home-manager config (tmux, shared across hosts)
+│   │   └── tv.nix          # TV/media machine config (idle-blank workaround, cockpit)
 │   ├── machines/           # Per-host machine configs
+│   │   ├── generic.nix     # Base host for initial installs (no hardware config)
 │   │   ├── frix.nix        # Framework Desktop (Ryzen AI Max)
 │   │   ├── enix.nix        # HP Envy laptop
 │   │   ├── nixd.nix        # Custom desktop (Ryzen 3700X)
@@ -138,7 +138,7 @@ layered on top.
 
 ## Nix Flake Architecture
 
-The flake (`nix/flake.nix`) defines **9 active hosts** in the `activeHosts` list
+The flake (`nix/flake.nix`) defines **10 active hosts** in the `activeHosts` list
 (`lb` is excluded — its machine config exists but is inactive). Each host gets a
 NixOS configuration built from:
 
@@ -149,7 +149,6 @@ NixOS configuration built from:
 ./machines/${host}.nix
 puma-dev.nixosModules.puma-dev   (all hosts)
 ds4.nixosModules.ds4             (all hosts)
-home-manager with ./includes/home.nix for user carl
 ```
 
 ### Flake inputs
@@ -159,19 +158,19 @@ home-manager with ./includes/home.nix for user carl
 | `nixpkgs` (nixos-unstable) | Primary package set |
 | `nixpkgs-master` (master) | Bleeding-edge packages (claude-code, pi, opencode, etc.) |
 | `nixos-hardware` | Hardware-specific NixOS modules |
-| `home-manager` | Per-user config management (tmux, vscodium) |
-| `llm-agents` | claude-code, pi, opencode, agent-browser packages |
 | `puma-dev` | Local puma-dev proxy service (used on frix, xps) |
 | `ds4` | DwarfStar (DeepSeek v4) inference service (frix only) |
 
 Commented-out inputs (not currently active): `nixpkgs-omnissa` (PR merged
 upstream, no longer needed), `hermes-agent`, `nix-openclaw`.
 
+Removed inputs: `llm-agents` — the LLM CLI tools (claude-code, agent-browser)
+now come from `nixpkgs-master` instead.
+
 ### specialArgs
 
 Every machine config receives these extra arguments:
 - `nixpkgs-master` — imported with `allowUnfree = true`
-- `llm-agents` — `llm-agents.packages.x86_64-linux`
 
 ### Host-specific includes
 
@@ -179,36 +178,22 @@ Machines import relevant includes in their `.nix` files:
 
 | Host | Includes |
 |------|----------|
-| **frix** | ai, gui, gnome, gnome-hidpi, gnome-niri, dev, printing |
-| **enix** | gui, gnome, gnome-niri, dev, printing |
-| **nixd** | ai, gui, gnome, dev, gaming, printing |
-| **xps** | gui, dev, ai, gaming, gnome, gnome-hidpi, gnome-niri, printing |
+| **generic** | gui, gnome |
+| **frix** | ai, gui, gnome, gnome-cosmic, dev, printing |
+| **enix** | gui, printing, gnome, gnome-cosmic |
+| **nixd** | ai, gui, gnome, gaming, printing |
+| **xps** | gui, dev, ai, gaming, gnome, printing |
 | **khoa** | gui, printing |
 | **phx** | gui, gnome, gaming, dev, printing |
 | **xtv** | ai, gui, tv, gaming, printing |
 | **nax** | ai, gui, tv |
 | **obak** | gui, tv |
-
-### Home Manager
-
-Home manager config lives in `nix/includes/home.nix` and is applied to user
-`carl` on every host. It currently configures tmux with full keybindings,
-status bar, and mouse-mode toggles. The `flake.nix` wires it up as:
-
-```nix
-home-manager.users.carl = ./includes/home.nix;
-```
-
-Machine-specific home-manager overrides are possible — `gui.nix` shows a
-pattern where it adds vscodium config inside a `home-manager.users.carl` block
-scoped to that machine's module, enabling FHS-wrapped vscodium with extensions
-like continue.continue and shopify.ruby-lsp.
+| *lb (inactive)* | gui, gnome, gaming, printing |
 
 ### Important conventions
 
 - **`nixpkgs-master`** is passed as a `specialArg` to every machine config,
   giving access to bleeding-edge packages (e.g., `nixpkgs-master.claude-code`).
-- **`llm-agents`** provides claude-code, pi, opencode, agent-browser.
 - `nixpkgs-omnissa` input has been removed — the omnissa-horizon-client tile-font
   fix landed upstream, so it now comes from regular `pkgs`.
 - Machine configs use `lib.mkDefault` / `lib.mkForce` for safe overrides.
@@ -263,7 +248,7 @@ Hooks can be skipped with `--no-hooks`.
    or laptops during battery use. The remote builder must accept the Nix remote
    builder protocol.
 
-4. **Home Manager in machine configs**: Machine-specific home-manager overrides
-   should be placed in the machine's `.nix` file as a `home-manager.users.carl`
-   block, not in `includes/home.nix`, which is shared across all hosts.
-   The `gui.nix` module demonstrates this pattern for vscodium config.
+4. **No Home Manager**: this repo manages dotfiles itself via
+   `bin/install_dotfiles` (`home/` and `home-files/`). Don't reach for
+   `home-manager.users.carl` blocks — put user-facing config in `home/`, and
+   packages in `environment.systemPackages`.
