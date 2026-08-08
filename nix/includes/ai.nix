@@ -1,4 +1,4 @@
-{ config, lib, pkgs, nixpkgs-master, llm-agents, ... }:
+{ config, lib, pkgs, nixpkgs-master, ... }:
 let
   # moreStablePkgs = import (builtins.fetchTarball{
   #   url = "https://github.com/NixOS/nixpkgs/archive/c7cc0ac6c16499d3937dd5eb7446ab1cc1df304f.tar.gz";

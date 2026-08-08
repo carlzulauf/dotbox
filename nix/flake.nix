@@ -11,9 +11,6 @@
     # used for better per-machine hardware support
     nixos-hardware.url = "github:NixOS/nixos-hardware/master";
 
-    # gem some LLM tools from this repo instead
-    llm-agents.url = "github:numtide/llm-agents.nix";
-
     # reverse proxy that sets up per app subdomains on
     #  port 80/443 with SSL for locally running apps (ie: dev)
     puma-dev.url = "github:carlzulauf/puma-dev-flake";
@@ -50,7 +47,6 @@
           system = "x86_64-linux";
           config.allowUnfree = true;
         };
-        llm-agents = attrs.llm-agents.packages.x86_64-linux;
       };
       modules = [
         ./configuration.nix
