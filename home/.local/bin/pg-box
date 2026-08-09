@@ -5,16 +5,18 @@ require "fileutils"
 require "shellwords"
 
 DEFAULT_DIR = "~/.local/share/postgres"
+DEFAULT_PORT = 5432
 
 # initdb --locale en_US.UTF-8 -D ~/.local/share/postgres/data
 # postgresql-check-db-dir ~/.local/share/postgres/data
-# postgres -D ~/.local/share/postgres/data -k ~/.local/share/postgres
+# postgres -D ~/.local/share/postgres/data -k ~/.local/share/postgres -p 5432
 
 class Script < Struct.new(:options)
   def self.parse_options(argv)
     options = {
       dir: File.expand_path(DEFAULT_DIR),
       init: true,
+      port: DEFAULT_PORT,
       version: "latest",
     }
 
@@ -27,6 +29,10 @@ class Script < Struct.new(:options)
 
       op.on("-d DIR", "--dir DIR", "Postgres working+data dir. Default is #{DEFAULT_DIR}") do |dir|
         options[:dir] = File.expand_path(dir)
+      end
+
+      op.on("-p PORT", "--port PORT", Integer, "TCP port to listen on. Default is #{DEFAULT_PORT}.") do |port|
+        options[:port] = port
       end
 
       op.on("-v VERSION", "--version VERSION", "Version of postgres container to pull. Default is latest.") do |version|
@@ -51,12 +57,16 @@ class Script < Struct.new(:options)
 
     init_data_dir if options[:init] && !File.exist?(data_dir)
 
-    puts "Running postgres on distrobox '#{options[:distrobox]}'"
-    dbx_exec("postgres -D #{data_dir} -k #{options[:dir]}")
+    puts "Running postgres on distrobox '#{options[:distrobox]}' (port #{options[:port]})"
+    dbx_exec("postgres -D #{esc(data_dir)} -k #{esc(options[:dir])} -p #{options[:port]}")
   end
 
   def data_dir
     File.join(options[:dir], "data")
+  end
+
+  def esc(path)
+    Shellwords.escape(path)
   end
 
   def dbx_exec(cmd)
@@ -68,7 +78,7 @@ class Script < Struct.new(:options)
   def init_data_dir
     FileUtils.mkpath(data_dir)
     # initdb --locale en_US.UTF-8 -D ~/.local/share/postgres/data
-    dbx_exec("initdb --locale en_US.UTF-8 -D #{Shellwords.escape(data_dir)}")
+    dbx_exec("initdb --locale en_US.UTF-8 -D #{esc(data_dir)}")
   end
 
   def find_or_create_postgres_box
