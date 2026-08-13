@@ -11,8 +11,6 @@ in
 {
   environment.systemPackages = with pkgs; [
     git-lfs
-    intel-gpu-tools
-
     nixpkgs-master.llmfit
   ];
 

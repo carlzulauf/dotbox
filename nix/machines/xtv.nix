@@ -9,7 +9,7 @@
     [
       nixos-hardware.nixosModules.common-cpu-amd
       nixos-hardware.nixosModules.common-cpu-amd-pstate
-      # nixos-hardware.nixosModules.common-cpu-amd-zenpower # failing 3/26/2025
+      nixos-hardware.nixosModules.common-cpu-amd-zenpower
       nixos-hardware.nixosModules.common-gpu-amd
       ../includes/ai.nix
       ../includes/gui.nix
@@ -20,7 +20,10 @@
 
   boot.kernelPackages = pkgs.linuxPackages_latest;
 
-  # environment.systemPackages = with pkgs; [ ];
+  environment.systemPackages = with pkgs; [
+    vulkan-tools # vulkaninfo for GPU debugging
+    nvtopPackages.amd
+  ];
 
   # found windows drive via `map -c` and trying to run `X:\EFI\Microsoft\Boot\Bootmgfw.efi`
   boot.loader.systemd-boot.windows = {
@@ -30,10 +33,18 @@
     };
   };
 
+  hardware.graphics = {
+    enable = true;
+    enable32Bit = true;
+    extraPackages = with pkgs; [ vulkan-tools ];
+  };
+
   time.timeZone = "America/Chicago";
 
-  services.ollama = {
-    package = pkgs.ollama-rocm;
+  # optimized for qwen3.5 9b
+  services.ollama.environmentVariables = {
+    OLLAMA_CONTEXT_LENGTH = "32768";
+    OLLAMA_KV_CACHE_TYPE = "q8_0";
   };
 
   services.open-webui = {
