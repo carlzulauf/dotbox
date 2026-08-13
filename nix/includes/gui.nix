@@ -9,8 +9,7 @@
     # trying some matrix clients
     element-desktop fractal
     keepassxc
-    # vlc handbrake audacity
-    vlc handbrake audacity
+    vlc audacity
     playerctl
     flatpak appimage-run
     ventoy
