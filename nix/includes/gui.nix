@@ -22,15 +22,6 @@
     })
   ];
 
-  # maybe this will go away some day soon. wayland is pretty decent now.
-  services.xserver = {
-    enable = true;
-    xkb = {
-      layout = "us";
-      variant = "";
-    };
-  };
-
   hardware.bluetooth = {
     enable = true;
     powerOnBoot = true;
@@ -44,6 +35,10 @@
       };
     };
   };
+
+  gtk.iconCache.enable = true;
+  programs.ssh.enableAskPassword = true; # SSH_ASKPASS for GUI passphrase prompts
+  programs.ssh.setXAuthLocation = true; # XAuthLocation, for `ssh -X`
 
   services.pulseaudio.enable = false;
   security.rtkit.enable = true;
