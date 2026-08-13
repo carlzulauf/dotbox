@@ -6,8 +6,6 @@
     google-chrome chromium brave
     gimp inkscape
     signal-desktop
-    # trying some matrix clients
-    element-desktop fractal
     keepassxc
     vlc audacity
     playerctl
