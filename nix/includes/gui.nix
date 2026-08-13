@@ -12,7 +12,6 @@
     flatpak appimage-run
     ventoy
     cpu-x
-    vscodium
     (vscode-with-extensions.override {
       vscode = vscodium;
       vscodeExtensions = with vscode-extensions; [
