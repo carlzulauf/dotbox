@@ -87,6 +87,4 @@
     port = 4141; # AI! AI!
     openFirewall = true;
   };
-
-  time.timeZone = "America/Chicago";
 }

@@ -50,5 +50,4 @@
   # programs.iio-hyprland.enable = true;
   # services.hypridle.enable = true;
   # programs.hyprlock.enable = true;
-  time.timeZone = "America/Chicago";
 }

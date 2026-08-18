@@ -43,7 +43,4 @@
     enable = true;
     user = "carl";
   };
-
-  # --- Timezone & Location ---
-  time.timeZone = "America/Chicago";
 }
