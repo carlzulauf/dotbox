@@ -11,6 +11,7 @@
     ../includes/gaming.nix
     ../includes/gnome.nix
     ../includes/printing.nix
+    ../pkgs/ipu7-camera/module.nix
   ];
 
   boot.kernelPackages = pkgs.linuxPackages_latest;
