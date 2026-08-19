@@ -12,11 +12,12 @@
 #      tracks upstreaming it).
 #
 #   2. Upstream lists INTC10DE in acpi_ignore_dep_ids[] (commit 4405a214df14),
-#      so ov02c10 does *not* wait for CVS and probes -- and fails -- early in
-#      boot regardless of module load order.  A modprobe softdep cannot fix
-#      this; it orders module loading, not device probing.  Until the pending
-#      "media: ipu-bridge: Add DMI quirk for CVS-sensor dependency" lands, the
-#      fix is to rebind ov02c10 once intel_cvs has taken the sensor.
+#      so ov02c10 does *not* wait for CVS via ACPI _DEP.  What orders them in
+#      practice is that ipu-bridge only instantiates the sensor's I2C client
+#      once intel_ipu7 probes, so loading intel_cvs before intel_ipu7 -- the
+#      softdep below -- gets CVS bound and its ownership transfer done before
+#      ov02c10 ever touches the bus.  ipu7-camera-bind.service is the fallback
+#      for when that loses the race, plus the permissions fixup.
 #
 # Userspace is libcamera's `simple` pipeline handler plus the software ISP;
 # there is no open driver for the IPU7 hardware ISP.  PipeWire picks the
@@ -46,11 +47,26 @@ let
   sensorOwner = "${cvsSysfs}/sensor_owner";
   sensorDriver = "/sys/bus/i2c/drivers/ov02c10";
   sensorDevice = "i2c-OVTI02C1:00";
+  isysDriver = "/sys/bus/auxiliary/drivers/intel_ipu7_isys.isys";
+  isysDevice = "intel_ipu7.isys.*";
 
+  # In the normal case intel_cvs hands the sensor over in time and ov02c10
+  # probes by itself; this service only has to fix up permissions.  The
+  # rebind below is the fallback for when it does not, and it deliberately
+  # waits for ipu7-isys first: unbinding the sensor after isys has registered
+  # its async notifier leaves the notifier stuck waiting forever, and the
+  # staging driver never recovers.
   bindSensor = pkgs.writeShellApplication {
     name = "ipu7-camera-bind";
     runtimeInputs = [ pkgs.coreutils ];
     text = ''
+      isys_bound() {
+        for link in ${isysDriver}/${isysDevice}; do
+          [ -e "$link" ] && return 0
+        done
+        return 1
+      }
+
       # intel_cvs creates sensor_owner when it binds, which happens only after
       # the USBIO bridge has enumerated its I2C adapters.
       for _ in $(seq 1 300); do
@@ -67,24 +83,45 @@ let
       chgrp video "${sensorOwner}"
       chmod g+w "${sensorOwner}"
 
-      # intel_cvs holds the sensor for ten seconds after probe so that
-      # dependent drivers can bind.  If we are still inside that window just
-      # rebind and let its timer hand the sensor back; if we missed it, take
-      # the sensor ourselves and release it once ov02c10 is up.
+      # Nothing below is meaningful until ipu7-isys is up to match the sensor.
+      for _ in $(seq 1 300); do
+        isys_bound && break
+        sleep 0.1
+      done
+      if ! isys_bound; then
+        echo "ipu7-isys never bound; leaving the sensor alone" >&2
+        exit 1
+      fi
+
+      # Give ov02c10 a moment to probe on its own before stepping in.
+      for _ in $(seq 1 100); do
+        [ -e "${sensorDriver}/${sensorDevice}" ] && break
+        sleep 0.1
+      done
+
+      if [ -e "${sensorDriver}/${sensorDevice}" ]; then
+        echo "ov02c10 is bound to ${sensorDevice}; nothing to do"
+        exit 0
+      fi
+
+      # Fallback: ov02c10 lost the race with CVS.  Take the sensor, bind, and
+      # hand it back so the privacy LED goes out.
+      echo "ov02c10 did not bind on its own; taking the sensor and binding it"
       borrowed=""
       if [ "$(cat "${sensorOwner}")" = "cvs" ]; then
         echo ipu > "${sensorOwner}"
         borrowed=1
       fi
 
-      if [ -e "${sensorDriver}/${sensorDevice}" ]; then
-        echo "${sensorDevice}" > "${sensorDriver}/unbind"
+      if ! echo "${sensorDevice}" > "${sensorDriver}/bind"; then
+        echo "binding ${sensorDevice} to ov02c10 failed" >&2
+        [ -n "$borrowed" ] && echo cvs > "${sensorOwner}"
+        exit 1
       fi
-      echo "${sensorDevice}" > "${sensorDriver}/bind"
 
       if [ -n "$borrowed" ]; then
-        # Give ipu7-isys time to finish async subdev registration before the
-        # sensor stops answering on I2C again.
+        # Let isys finish async subdev registration before the sensor stops
+        # answering on I2C again.
         sleep 1
         echo cvs > "${sensorOwner}"
       fi
@@ -140,16 +177,16 @@ in
   # visible in the journal rather than silent.
   boot.kernelModules = [ "intel_cvs" ];
 
-  # Best effort at getting CVS bound before ipu-bridge instantiates the
-  # sensor's I2C client.  It usually loses the race against USB enumeration,
-  # which is what ipu7-camera-bind.service is for, but it costs nothing.
+  # This is what actually orders the stack: ipu-bridge does not instantiate
+  # the sensor's I2C client until intel_ipu7 probes, so pulling intel_cvs in
+  # first gets the CVS ownership transfer done before ov02c10 probes.
   boot.extraModprobeConfig = ''
     softdep intel_ipu7 pre: intel_cvs
   '';
 
   # ── Sensor handover ───────────────────────────────────────────────────────
   systemd.services.ipu7-camera-bind = {
-    description = "Bind the IPU7 camera sensor once intel_cvs has released it";
+    description = "Ensure the IPU7 camera sensor is bound and host-takeable";
     wantedBy = [ "multi-user.target" ];
     serviceConfig = {
       Type = "oneshot";
@@ -158,7 +195,8 @@ in
   };
 
   # Re-run on any later intel_cvs bind: USB resets and resume from suspend
-  # both tear the CVS device down and bring it back.
+  # both tear the CVS device down and bring it back.  Safe to fire early --
+  # the service waits for ipu7-isys and no-ops when ov02c10 is already bound.
   services.udev.extraRules = ''
     ACTION=="bind", SUBSYSTEM=="i2c", DRIVER=="intel_cvs", TAG+="systemd", ENV{SYSTEMD_WANTS}+="ipu7-camera-bind.service"
   '';
