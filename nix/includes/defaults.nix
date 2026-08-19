@@ -6,6 +6,26 @@ let
   # }) {
   #   system = "x86_64-linux";
   # };
+
+  # nix-direnv 3.2.0 misbehaves when several tmux windows load the same
+  # flake-based .envrc at once, so stay on 3.1.2 (latest 3.1.x) until that's
+  # fixed upstream. resholve builds nix-direnv in two stages, so the older
+  # source has to be swapped into the inner (unresholved) derivation as well as
+  # the outer one, otherwise only the resholve wrapper gets downgraded.
+  useNixDirenv312 = drv: drv.overrideAttrs (_: {
+    version = "3.1.2";
+    src = pkgs.fetchFromGitHub {
+      owner = "nix-community";
+      repo = "nix-direnv";
+      rev = "3.1.2";
+      hash = "sha256-3qT5mSqHi+0cskdoOGPVbuSzkoWtwOHBVXUOL84dAM8=";
+    };
+  });
+  # matches the module default, which builds against the system's nix
+  nixDirenv = pkgs.nix-direnv.override { nix = config.nix.package; };
+  nixDirenvPinned = (useNixDirenv312 nixDirenv).overrideAttrs (_: {
+    src = useNixDirenv312 nixDirenv.unresholved;
+  });
 in
 {
   config = {
@@ -92,7 +112,10 @@ in
     programs.direnv = {
       enable = true;
       enableFishIntegration = true;
-      nix-direnv.enable = true;
+      nix-direnv = {
+        enable = true;
+        package = nixDirenvPinned;
+      };
     };
 
     # nix-ld provides /lib64/ld-linux-x86-64.so.2, letting FHS-compiled binaries
