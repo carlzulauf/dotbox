@@ -23,7 +23,16 @@ stdenv.mkDerivation {
     hash = "sha256-i/qZN8GXyqaE6n6pRtxQLdmGhmPDjoArzVvflDmwuSs=";
   };
 
-  patches = [ ./sensor-owner.patch ];
+  patches = [
+    ./sensor-owner.patch
+    ./csi-subdev.patch
+  ];
+
+  # Shipped as a plain source file rather than a patch hunk so it stays
+  # readable and reviewable; csi-subdev.patch only adds the hooks for it.
+  postPatch = ''
+    cp ${./intel_cvs_csi.c} drivers/misc/icvs/intel_cvs_csi.c
+  '';
 
   nativeBuildInputs = kernel.moduleBuildDependencies;
 

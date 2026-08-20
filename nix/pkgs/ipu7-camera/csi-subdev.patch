@@ -1,0 +1,60 @@
+diff -ruN -x intel_cvs_csi.c base/drivers/misc/icvs/intel_cvs.c work/drivers/misc/icvs/intel_cvs.c
+--- a/drivers/misc/icvs/intel_cvs.c	2026-08-20 10:00:50.969460086 -0600
++++ b/drivers/misc/icvs/intel_cvs.c	2026-08-20 10:02:30.491770946 -0600
+@@ -202,6 +202,13 @@
+ 
+ 	acpi_dev_clear_dependencies(ACPI_COMPANION(icvs->dev));
+ 
++	/*
++	 * ipu-bridge wires this device into the camera fwnode graph from
++	 * intel_ipu7's probe, which cannot run until we exist -- so the
++	 * graph is never ready yet here.  cvs_csi_register() waits for it.
++	 */
++	cvs_csi_register(icvs->dev);
++
+ exit:
+ 	if (ret)
+ 		devm_kfree(icvs->dev, icvs);
+@@ -235,6 +242,7 @@
+ 		dev_info(dev, "%s (platform)\n", __func__);
+ 	}
+ 	if (icvs) {
++		cvs_csi_unregister(dev);
+ 		cancel_delayed_work_sync(&icvs->delayed_release);
+ 		if (icvs->owner == CVS_CAMERA_IPU)
+ 			cvs_release_camera_sensor_internal();
+diff -ruN -x intel_cvs_csi.c base/drivers/misc/icvs/Makefile work/drivers/misc/icvs/Makefile
+--- a/drivers/misc/icvs/Makefile	2026-08-20 10:00:50.969398603 -0600
++++ b/drivers/misc/icvs/Makefile	2026-08-20 10:02:30.491555904 -0600
+@@ -3,3 +3,4 @@
+ 
+ obj-$(CONFIG_INTEL_CVS)	+= intel_cvs.o
+ obj-$(CONFIG_INTEL_CVS)	+= intel_cvs_update.o
++obj-$(CONFIG_INTEL_CVS)	+= intel_cvs_csi.o
+diff -ruN -x intel_cvs_csi.c base/include/linux/intel_cvs.h work/include/linux/intel_cvs.h
+--- a/include/linux/intel_cvs.h	2026-08-20 10:00:50.969522086 -0600
++++ b/include/linux/intel_cvs.h	2026-08-20 10:02:30.491629820 -0600
+@@ -216,6 +216,10 @@
+ 	struct ctrl_data_fwupd info_fwupd;
+ };
+ 
++/* intel_cvs_csi.c: CSI-2 pass-through sub-device between sensor and IPU. */
++int cvs_csi_register(struct device *dev);
++void cvs_csi_unregister(struct device *dev);
++
+ #ifdef DEBUG_CVS
+ int cvs_sysfs_dump(char *buf);
+ int cvs_exec_cmd(enum cvs_command command);
+diff -ruN -x intel_cvs_csi.c base/Makefile work/Makefile
+--- a/Makefile	2026-08-20 10:00:50.969560993 -0600
++++ b/Makefile	2026-08-20 10:02:30.491443992 -0600
+@@ -2,7 +2,8 @@
+ # Copyright (c) 2024 Intel Corporation.
+ 
+ obj-m += intel_cvs.o
+-intel_cvs-y := drivers/misc/icvs/intel_cvs.o drivers/misc/icvs/intel_cvs_update.o
++intel_cvs-y := drivers/misc/icvs/intel_cvs.o drivers/misc/icvs/intel_cvs_update.o \
++		drivers/misc/icvs/intel_cvs_csi.o
+ 
+ KERNELRELEASE ?= $(shell uname -r)
+ KERNEL_SRC ?= /lib/modules/$(KERNELRELEASE)/build
