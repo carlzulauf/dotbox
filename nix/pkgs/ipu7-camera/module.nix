@@ -24,20 +24,23 @@
 #      subdev.  The notifier waits forever, the sensor is never matched, and
 #      libcamera reports "No sensor found for /dev/media0".
 #
-# ipu-bridge only inserts that hop when bus_find_device_by_acpi_dev() finds an
-# i2c client for INTC10DE at the moment intel_ipu7 probes; with no CVS device
-# it wires the sensor straight to the IPU (see the sensor->csi_dev branches in
-# ipu_bridge_create_connection_swnodes).  So the fix here is ordering: keep the
-# USBIO bridge -- and hence both i2c clients -- out of the way until
-# intel_ipu7 has probed, then bring the stack up by hand in an order that
-# works.  That restores the direct sensor->IPU topology which is what the CVS
-# passes through anyway, and which worked before c6b1b34b5090 landed.
+# Supplying that missing subdev is what ./default.nix patches in:
+# intel_cvs_csi.c gives intel_cvs a two-pad v4l2 pass-through sub-device that
+# registers against the INTC10DE-0 fwnode, runs its own async notifier to
+# match the sensor, and performs the ownership handover in .s_stream.  That
+# closes the graph the way ipu-bridge expects it to be closed, and as a
+# side-effect ties the privacy LED to actual streaming instead of to a manual
+# acquire.
 #
 # Userspace is libcamera's `simple` pipeline handler plus the software ISP;
 # there is no open driver for the IPU7 hardware ISP.  PipeWire picks the
 # camera up through WirePlumber's libcamera monitor, which is what portal
-# clients (GNOME Snapshot, Firefox, Chromium) consume.  Applications that
-# open /dev/video* directly (Zoom, Discord) still need a v4l2loopback bridge.
+# clients (GNOME Snapshot, Firefox, Chromium) consume.
+#
+# Applications that open /dev/video* directly -- Zoom, Discord, Slack -- do
+# not go through libcamera or the portal at all, so they cannot see the camera
+# no matter how healthy the graph is.  Those get a v4l2loopback device fed by
+# a gstreamer pipeline; see ipu7-camera-bridge below.
 {
   config,
   lib,
@@ -187,22 +190,87 @@ let
       esac
     '';
   };
+
+  # ── v4l2loopback bridge ───────────────────────────────────────────────────
+  # video_nr is pinned well clear of the IPU7 nodes, which take video0-31.
+  loopbackNr = 42;
+  loopbackDev = "/dev/video${toString loopbackNr}";
+  loopbackLabel = "Integrated Camera";
+
+  # gst-launch resolves elements through GST_PLUGIN_SYSTEM_PATH_1_0, not PATH:
+  # libcamera supplies libcamerasrc, gst-plugins-good supplies v4l2sink,
+  # gst-plugins-base supplies videoconvertscale.  Pulling libcamera from pkgs
+  # rather than pinning a store path keeps the bridge on the same build
+  # PipeWire uses, useGpuSoftIsp overlay included.
+  gstPluginPath = lib.makeSearchPathOutput "lib" "lib/gstreamer-1.0" [
+    pkgs.gst_all_1.gstreamer
+    pkgs.gst_all_1.gst-plugins-base
+    pkgs.gst_all_1.gst-plugins-good
+    pkgs.libcamera
+  ];
+
+  cameraBridge = pkgs.writeShellApplication {
+    name = "ipu7-camera-bridge";
+    runtimeInputs = [
+      pkgs.coreutils
+      pkgs.gst_all_1.gstreamer
+    ];
+    text = ''
+      export GST_PLUGIN_SYSTEM_PATH_1_0="${gstPluginPath}"
+
+      width="''${CAMERA_WIDTH:-1280}"
+      height="''${CAMERA_HEIGHT:-720}"
+
+      if [ ! -e "${loopbackDev}" ]; then
+        echo "ipu7-camera-bridge: ${loopbackDev} missing; v4l2loopback not loaded" >&2
+        exit 1
+      fi
+
+      # The CSI subdev acquires the sensor from .s_stream, so no explicit
+      # `ipu7-camera acquire` is needed here.  Note that the privacy LED is
+      # lit for as long as this pipeline runs, not just while an application
+      # is reading from the loopback -- hence on-demand rather than at boot.
+      exec gst-launch-1.0 -e \
+        libcamerasrc \
+        ! "video/x-raw,width=$width,height=$height" \
+        ! queue max-size-buffers=4 leaky=downstream \
+        ! videoconvertscale \
+        ! "video/x-raw,format=YUY2,width=$width,height=$height" \
+        ! v4l2sink device=${loopbackDev} sync=false
+    '';
+  };
 in
 {
   # ── Kernel ────────────────────────────────────────────────────────────────
-  boot.extraModulePackages = [ visionDrivers ];
+  boot.extraModulePackages = [
+    visionDrivers
+    config.boot.kernelPackages.v4l2loopback
+  ];
 
-  # Keep all three out of the boot-time autoload path.  usbio is the one that
-  # matters -- it creates i2c-INTC10DE:00, which is what makes ipu-bridge
-  # insert the CVS into the graph -- but intel_cvs has a softdep on usbio and
-  # would drag it in, and ov02c10 would then probe before the CVS handover.
-  # ipu7-camera-up.service loads all three by name once intel_ipu7 is bound;
-  # `blacklist` only suppresses alias-driven autoloading, not modprobe.
+  # Deferred autoload, then an explicit bring-up in a known order.  This dates
+  # from an earlier attempt to keep the CVS out of the fwnode graph entirely,
+  # which does not work -- intel_ipu7 returns -EPROBE_DEFER until the CVS i2c
+  # device exists, so the wait in ipu7-camera-up always times out and the CVS
+  # ends up in the graph regardless.  With the CSI subdev above that is the
+  # correct topology anyway, which is why the camera works.  The ordering here
+  # is therefore doing nothing useful and costs 30s of wait at boot; removing
+  # it is a separate change, worth making on its own so any regression is
+  # attributable.  `blacklist` only suppresses alias-driven autoloading, so
+  # ipu7-camera-up can still modprobe all three by name.
   boot.blacklistedKernelModules = [
     "usbio"
     "intel_cvs"
     "ov02c10"
   ];
+
+  # exclusive_caps=1 makes the node advertise V4L2_CAP_VIDEO_CAPTURE only once
+  # a producer is attached, so applications do not offer a camera that would
+  # hand them a black frame.  The flip side is that ipu7-camera-bridge has to
+  # be running *before* an app enumerates its devices.
+  boot.kernelModules = [ "v4l2loopback" ];
+  boot.extraModprobeConfig = ''
+    options v4l2loopback devices=1 video_nr=${toString loopbackNr} card_label="${loopbackLabel}" exclusive_caps=1
+  '';
 
   # ── Bring-up ──────────────────────────────────────────────────────────────
   systemd.services.ipu7-camera-up = {
@@ -218,7 +286,21 @@ in
   # USBIO bridge down and bring it back.  The script is idempotent.
   services.udev.extraRules = ''
     ACTION=="bind", SUBSYSTEM=="i2c", DRIVER=="intel_cvs", TAG+="systemd", ENV{SYSTEMD_WANTS}+="ipu7-camera-up.service"
+    KERNEL=="video${toString loopbackNr}", SUBSYSTEM=="video4linux", GROUP="video", MODE="0660", TAG+="uaccess"
   '';
+
+  # Deliberately not wantedBy anything: the privacy LED tracks this service,
+  # so it is started per-meeting rather than held open all session.  Either
+  # `systemctl --user start ipu7-camera-bridge` or run ipu7-camera-bridge in a
+  # terminal; both must happen before the consuming app starts.
+  systemd.user.services.ipu7-camera-bridge = {
+    description = "Publish the libcamera webcam on ${loopbackDev} for V4L2-only apps";
+    serviceConfig = {
+      ExecStart = lib.getExe cameraBridge;
+      Restart = "on-failure";
+      RestartSec = 2;
+    };
+  };
 
   # ── Userspace ─────────────────────────────────────────────────────────────
   nixpkgs.overlays = lib.optional useGpuSoftIsp (
@@ -234,6 +316,7 @@ in
 
   environment.systemPackages = [
     ipu7Camera
+    cameraBridge
     pkgs.libcamera # `cam` for enumeration and capture smoke tests
     pkgs.v4l-utils # `media-ctl -p`, `v4l2-ctl` for inspecting the ISYS graph
   ];
