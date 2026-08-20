@@ -33,6 +33,16 @@
         color-scheme = "prefer-dark";
         gtk-theme = "Adwaita-dark";
       };
+
+      # Without this, a fractional monitor scale makes mutter run Xwayland at the
+      # next integer scale up and downscale the result: at 2560x1600 / 1.25 the X
+      # screen is 2048x1280 * 2 = 4096x2560. X11 apps that report their own size
+      # to something else then report that inflated number -- the Omnissa Horizon
+      # client asks the VDI agent for 4096x2560, a no-GPU Windows VM can't
+      # allocate that framebuffer, refuses every resize, and the session sticks at
+      # a fixed resolution. Native scaling skips the upscale/downscale round trip.
+      # Undocumented in the schema description but present in the flags enum.
+      settings."org/gnome/mutter".experimental-features = [ "xwayland-native-scaling" ];
     }
   ];
 
