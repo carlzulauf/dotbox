@@ -54,11 +54,17 @@ let
   };
 
   # Build libcamera's software ISP with the GPU debayer path (EGL/GLESv2)
-  # instead of the CPU one.  Off by default: it is a libcamera 0.7 rebuild,
-  # and libcamera is a dependency of PipeWire, so flipping this drags most of
-  # the desktop closure along with it.  Worth turning on if CPU use during
-  # calls is a problem -- CPU debayer runs around 65% of a core at 1080p30.
-  useGpuSoftIsp = false;
+  # instead of the CPU one.  This is a libcamera 0.7 rebuild and libcamera is a
+  # dependency of PipeWire, so it drags most of the desktop closure along with
+  # it -- but the CPU debayer costs around 65% of a core at 1080p30, and the
+  # colour correction matrix enabled below adds to that.  debayer_egl.cpp binds
+  # the CCM to a shader uniform, so on this path the matrix is close to free.
+  #
+  # Once built with EGL support the GPU path becomes the default and there is
+  # no automatic fallback -- software_isp.cpp only constructs DebayerCpu when
+  # DebayerEGL was compiled out.  LIBCAMERA_SOFTISP_MODE=cpu forces the old
+  # path at runtime if the GPU one ever misbehaves.
+  useGpuSoftIsp = true;
 
   cvsSysfs = "/sys/bus/i2c/devices/i2c-INTC10DE:00";
   sensorOwner = "${cvsSysfs}/sensor_owner";
@@ -191,6 +197,53 @@ let
     '';
   };
 
+  # ── Colour tuning ─────────────────────────────────────────────────────────
+  # libcamera ships one tuning file for the `simple` IPA, uncalibrated.yaml,
+  # and its colour correction matrix is commented out.  With no CCM the
+  # debayered sensor RGB goes to sRGB untouched, and since raw Bayer primaries
+  # are much broader than sRGB the result is heavily desaturated.
+  #
+  # Enabling Ccm also unlocks the saturation knob: adjust.cpp only registers
+  # controls::Saturation, and only applies it, `if (context.ccmEnabled)`.
+  #
+  # software_isp.cpp asks for "<sensor model>.yaml" and falls back to
+  # "uncalibrated.yaml", and ipa_proxy.cpp searches LIBCAMERA_IPA_CONFIG_PATH
+  # as <dir>/simple/<name> ahead of the installed directory -- so this drops in
+  # without rebuilding libcamera, and iterating on the matrix below rebuilds
+  # only this derivation.  Both names are written because the model string is
+  # not worth guessing wrong; this machine has one camera either way.
+  #
+  # The matrix is an educated starting point for a consumer sensor, not a
+  # calibration -- there is no published ov02c10 tuning.  Rows sum to 1.0 so
+  # neutral grey stays neutral and white balance is unaffected.  Dial the
+  # result in with CAMERA_SATURATION rather than by editing these numbers.
+  #
+  # Ccm must precede Adjust: Ccm::prepare multiplies into combinedMatrix and
+  # Adjust::prepare applies saturation on top of the result.
+  cameraTuningYaml = pkgs.writeText "ov02c10.yaml" ''
+    %YAML 1.1
+    ---
+    version: 1
+    algorithms:
+      - BlackLevel:
+      - Awb:
+      - Ccm:
+          ccms:
+            - ct: 6500
+              ccm: [  1.80, -0.70, -0.10,
+                     -0.30,  1.60, -0.30,
+                      0.00, -0.60,  1.60 ]
+      - Adjust:
+      - Agc:
+    ...
+  '';
+
+  cameraTuning = pkgs.runCommand "libcamera-ov02c10-tuning" { } ''
+    mkdir -p "$out/simple"
+    cp ${cameraTuningYaml} "$out/simple/ov02c10.yaml"
+    cp ${cameraTuningYaml} "$out/simple/uncalibrated.yaml"
+  '';
+
   # ── v4l2loopback bridge ───────────────────────────────────────────────────
   # video_nr is pinned well clear of the IPU7 nodes, which take video0-31.
   loopbackNr = 42;
@@ -217,9 +270,13 @@ let
     ];
     text = ''
       export GST_PLUGIN_SYSTEM_PATH_1_0="${gstPluginPath}"
+      # Set explicitly rather than inherited, so the bridge is self-contained.
+      export LIBCAMERA_IPA_CONFIG_PATH="${cameraTuning}"
 
       width="''${CAMERA_WIDTH:-1280}"
       height="''${CAMERA_HEIGHT:-720}"
+      saturation="''${CAMERA_SATURATION:-1.0}"
+      contrast="''${CAMERA_CONTRAST:-1.0}"
 
       if [ ! -e "${loopbackDev}" ]; then
         echo "ipu7-camera-bridge: ${loopbackDev} missing; v4l2loopback not loaded" >&2
@@ -230,8 +287,11 @@ let
       # `ipu7-camera acquire` is needed here.  Note that the privacy LED is
       # lit for as long as this pipeline runs, not just while an application
       # is reading from the loopback -- hence on-demand rather than at boot.
+      # saturation/contrast are libcamera controls, applied inside the ISP
+      # before YUV conversion.  libcamerasrc logs "Control ... is not supported
+      # by the camera" rather than failing if the CCM did not load.
       exec gst-launch-1.0 -e \
-        libcamerasrc \
+        libcamerasrc saturation="$saturation" contrast="$contrast" \
         ! "video/x-raw,width=$width,height=$height" \
         ! queue max-size-buffers=4 leaky=downstream \
         ! videoconvertscale \
@@ -313,6 +373,16 @@ in
       });
     }
   );
+
+  # Two mechanisms, because the two classes of consumer read different sources:
+  # sessionVariables goes through pam_env and covers anything launched from the
+  # desktop session, while the environment.d drop-in is what `systemd --user`
+  # reads -- which is how PipeWire and WirePlumber get it.  NixOS already
+  # writes 50-systemd-path.conf into that directory.
+  environment.sessionVariables.LIBCAMERA_IPA_CONFIG_PATH = "${cameraTuning}";
+  environment.etc."environment.d/60-libcamera-tuning.conf".text = ''
+    LIBCAMERA_IPA_CONFIG_PATH=${cameraTuning}
+  '';
 
   environment.systemPackages = [
     ipu7Camera
