@@ -1,0 +1,85 @@
+#!/usr/bin/env ruby
+
+# chromium_debug
+# --------------
+# Start chromium with the remote debugging port open, using a dedicated user
+# data dir so it doesn't fight with (or leak into) a normal browsing profile.
+#
+#     chromium_debug                       # chromium on :9222
+#     chromium_debug -p 9333               # different port
+#     chromium_debug -e google-chrome      # different browser
+#     chromium_debug -- https://localhost  # extra args go to the browser
+#
+# More info: chromium_debug -h
+
+require "optparse"
+require "fileutils"
+
+DEFAULT_PORT = 9222
+DEFAULT_DIR  = "~/.config/chromium-debug"
+DEFAULT_EXE  = "chromium"
+
+class Script < Struct.new(:options, :extra_args)
+  def self.parse_options(argv)
+    options = {
+      port: DEFAULT_PORT,
+      dir: File.expand_path(DEFAULT_DIR),
+      exe: DEFAULT_EXE,
+    }
+
+    OptionParser.new do |op|
+      op.banner = "Usage: chromium_debug [options] [-- browser args]"
+
+      op.on("-p PORT", "--port PORT", Integer, "Remote debugging port. Default is #{DEFAULT_PORT}.") do |port|
+        options[:port] = port
+      end
+
+      op.on("-d DIR", "--data-dir DIR", "Browser user data dir. Default is #{DEFAULT_DIR}") do |dir|
+        options[:dir] = File.expand_path(dir)
+      end
+
+      op.on("-e EXE", "--exe EXE", "Browser executable to run. Default is #{DEFAULT_EXE}.") do |exe|
+        options[:exe] = exe
+      end
+
+      op.on("-h", "--help") do
+        puts op
+        exit
+      end
+    end.parse!(argv)
+
+    self.new options, argv
+  end
+
+  def call
+    abort "Could not find '#{options[:exe]}' on your PATH." unless which(options[:exe])
+
+    FileUtils.mkpath(options[:dir])
+
+    puts "Starting #{options[:exe]} with remote debugging on http://127.0.0.1:#{options[:port]}"
+    puts "Profile: #{options[:dir]}", nil
+    puts "$ #{cmd.join(' ')}"
+
+    $stdout.flush
+    exec(*cmd)
+  end
+
+  def cmd
+    [
+      options[:exe],
+      "--remote-debugging-port=#{options[:port]}",
+      "--user-data-dir=#{options[:dir]}",
+      "--no-first-run",
+      "--no-default-browser-check",
+    ] + extra_args
+  end
+
+  def which(exe)
+    ENV.fetch("PATH", "").split(File::PATH_SEPARATOR).any? do |dir|
+      path = File.join(dir, exe)
+      File.executable?(path) && !File.directory?(path)
+    end
+  end
+end
+
+Script.parse_options(ARGV).()
