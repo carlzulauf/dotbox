@@ -1,4 +1,4 @@
-{ config, pkgs, nixos-hardware, hermes-agent, ... }:
+{ config, pkgs, nixos-hardware, ... }:
 
 {
   # Ryzen 3700X desktop
@@ -101,12 +101,6 @@
   environment.systemPackages = with pkgs; [
     lact # control amdgpu
     vulkan-tools # vulkaninfo for GPU debugging
-
-    # Hermes agent CLI: `hermes --tui` for the TUI, `hermes dashboard` for the
-    # web UI. Deliberately NOT using hermes-agent.nixosModules.default — that
-    # module renders ~/.hermes/config.yaml from nix, making config read-only.
-    # Installed as a plain package, all config stays mutable in ~/.hermes.
-    hermes-agent.packages.${pkgs.system}.default
   ];
   systemd.packages = with pkgs; [ lact ];
   systemd.services.lactd.wantedBy = ["multi-user.target"];

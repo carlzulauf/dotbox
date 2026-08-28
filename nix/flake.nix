@@ -17,9 +17,6 @@
 
     # Nix flake for DwarfStar, model runner for DeepSeek V4 Flash/Pro
     ds4.url = "github:carlzulauf/ds4.nix";
-
-    # Hermes agent, provides a TUI coding/chat agent
-    hermes-agent.url = "github:NousResearch/hermes-agent";
   };
 
   outputs = {
