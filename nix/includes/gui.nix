@@ -18,6 +18,7 @@
         continue.continue
         jnoortheen.nix-ide
         shopify.ruby-lsp
+        stkb.rewrap
       ];
     })
   ];
