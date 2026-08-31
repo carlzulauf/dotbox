@@ -26,7 +26,7 @@ The `flake.nix` defines the following active systems:
 
 | Host | Description | Key Config Notes |
 | :--- | :--- | :--- |
-| **frix** | Framework Desktop (AMD Ryzen 9) | Ollama/ROCm support; GNOME + Niri. |
+| **frix** | Framework Desktop (AMD Ryzen 9) | ds4 + Ollama, switchable ROCm/Vulkan backends; GNOME + Niri. |
 | **enix** | HP Envy Laptop | |
 | **khoa** | Torrent Station | |
 | **nax** | NAS & Remote Builder | Used as a build host for faster derivation evaluation on larger machines. |
