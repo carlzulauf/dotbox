@@ -1,0 +1,16 @@
+#!/usr/bin/env ruby
+
+# Reports whether the laptop lid is closed, via systemd-logind.
+
+require 'open3'
+
+out, err, status = Open3.capture3(
+  "busctl", "get-property",
+  "org.freedesktop.login1", "/org/freedesktop/login1",
+  "org.freedesktop.login1.Manager", "LidClosed"
+)
+
+raise err unless status.success?
+
+closed = out.chomp == "b true"
+puts "Laptop Lid: #{closed ? "Closed" : "Open"}"
