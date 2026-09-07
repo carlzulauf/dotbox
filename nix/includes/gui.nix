@@ -9,6 +9,7 @@
     keepassxc
     vlc audacity
     playerctl
+    wl-clipboard # wl-copy/wl-paste: lets micro & other TUIs use the system clipboard
     flatpak appimage-run
     ventoy
     cpu-x
