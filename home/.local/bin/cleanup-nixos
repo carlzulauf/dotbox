@@ -1,15 +1,118 @@
 #!/usr/bin/env ruby
 
-# delete everything but active profile: `old`
-# delete everything older than 10 days: `10d`
-gens = ARGV[0] || "+4"
+# cleanup-nixos
+# -------------
+# Trim old Nix profile generations, then collect the garbage that frees up.
+#
+# The generation spec is passed straight through to `nix-env --delete-generations`:
+#
+#   +5    keep the newest 5 generations
+#   30d   delete generations created more than 30 days ago
+#   old   delete everything but the active generation
+#
+# With no spec, the count is read from the running system's
+# boot.loader.systemd-boot.configurationLimit, so the number of kept
+# generation's matches which generations are reachable on the current host.
+#
+# `nix-env --delete-generations` acts on the *caller's default package profile*.
+# Under sudo that is root's profile, not /nix/var/nix/profiles/system -- so a
+# bare invocation never touches NixOS system generations, and they accumulate
+# forever along with their /boot entries. Hence the explicit --profile below.
+#
+# --boot-sync reinstalls the boot loader after trimming. The ESP holds *copies*
+# of each generation's kernel and initrd, and is only reconciled during a boot
+# loader install, so deleting a generation that still has a menu entry leaves one
+# that boots, then panics in stage 2 on an `init=` path that no longer exists.
+#
+# Only needed when the trim reaches generations that still have entries, i.e.
+# when the spec is tighter than the configurationLimit the boot loader last wrote
+# with. A bare run straight after a rebuild trims exactly the generations whose
+# entries that rebuild already dropped, so it has nothing to reconcile.
 
-[
-  "nix-env --delete-generations #{gens}",
-  "sudo nix-env --delete-generations #{gens}",
-  "nix-collect-garbage",
-  "sudo nix-collect-garbage",
-].each do |cmd|
-  puts " $ #{cmd}"
-  system cmd
+require 'optparse'
+
+SYSTEM_PROFILE = "/nix/var/nix/profiles/system"
+ROOT_PROFILE   = "/nix/var/nix/profiles/per-user/root/profile"
+USER_PROFILE   = File.expand_path("~/.nix-profile")
+
+FALLBACK_GENERATIONS = "+5"
+
+# Best effort: configurationLimit is baked into the generated boot loader
+# builder as `CONFIGURATION_LIMIT = int("N")`, where 0 means unlimited. It is
+# not exposed anywhere more stable, so treat any surprise as "use the fallback".
+def configured_generations
+  wrapper   = File.read(File.join(SYSTEM_PROFILE, "bin/switch-to-configuration"))
+  installer = wrapper[/INSTALL_BOOTLOADER='([^']+)'/, 1] or return nil
+  builder   = File.read(installer)[%r{/nix/store/\S+/bin/systemd-boot}] or return nil
+  limit     = File.read(builder)[/^CONFIGURATION_LIMIT = int\("(\d+)"\)/, 1].to_i
+
+  limit.positive? ? "+#{limit}" : nil
+rescue SystemCallError
+  nil
+end
+
+options = { dry_run: false, boot_sync: false }
+
+OptionParser.new do |op|
+  op.banner = "Usage: cleanup-nixos [options] [generation-spec]"
+
+  op.on("-n", "--dry-run", "Print the commands without running them") do
+    options[:dry_run] = true
+  end
+
+  op.on("--boot-sync", "Reinstall the boot loader after trimming, dropping stale entries") do
+    options[:boot_sync] = true
+  end
+
+  op.on("-h", "--help") do
+    puts op
+    exit
+  end
+end.parse!
+
+gens = ARGV.first
+if gens.nil?
+  gens = configured_generations
+  if gens
+    puts "Keeping #{gens[1..]} generations, per configurationLimit."
+  else
+    # The fallback can be tighter than the real limit (frix keeps 10), which would
+    # strand entries. Not knowing the limit is precisely when we must reconcile.
+    gens = FALLBACK_GENERATIONS
+    options[:boot_sync] = true
+    puts "Could not read configurationLimit; falling back to #{gens} with --boot-sync."
+  end
+end
+
+commands = []
+
+# The one that actually matters: NixOS system generations and their boot entries.
+commands << ["sudo", "nix-env", "--profile", SYSTEM_PROFILE, "--delete-generations", gens]
+
+if options[:boot_sync]
+  commands << ["sudo", File.join(SYSTEM_PROFILE, "bin/switch-to-configuration"), "boot"]
+end
+
+# Package profiles. Absent on machines that install everything declaratively.
+commands << ["sudo", "nix-env", "--profile", ROOT_PROFILE, "--delete-generations", gens] if File.exist?(ROOT_PROFILE)
+commands << ["nix-env", "--delete-generations", gens] if File.exist?(USER_PROFILE)
+
+# Generations are gone, so a plain collect is enough -- no --delete-old needed.
+commands << ["nix-collect-garbage"]
+commands << ["sudo", "nix-collect-garbage"]
+
+failed = []
+
+commands.each do |cmd|
+  puts " $ #{cmd.join(' ')}"
+  next if options[:dry_run]
+
+  failed << cmd unless system(*cmd)
+end
+
+unless failed.empty?
+  puts
+  puts "Failed:"
+  failed.each { |cmd| puts "  #{cmd.join(' ')}" }
+  exit 1
 end

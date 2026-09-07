@@ -110,6 +110,9 @@ in
   # extra bleeding edge kernel
   boot.kernelPackages = nixpkgs-master.linuxPackages_latest;
 
+  # Default is for 512MB /boot, but this one is 1GB
+  boot.loader.systemd-boot.configurationLimit = 10;
+
   imports =
     [
       nixos-hardware.nixosModules.common-pc-ssd

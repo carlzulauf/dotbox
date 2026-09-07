@@ -42,9 +42,12 @@ in
     };
 
     # Bootloader.
-    boot.loader.systemd-boot.enable = true;
-    boot.loader.systemd-boot.memtest86.enable = true;
-    boot.loader.systemd-boot.edk2-uefi-shell.enable = true;
+    boot.loader.systemd-boot = {
+      enable = true;
+      memtest86.enable = true;
+      edk2-uefi-shell.enable = true;
+      configurationLimit = lib.mkDefault 5; # some machines have bigger /boot
+    };
     boot.loader.efi.canTouchEfiVariables = true;
 
     boot.supportedFilesystems = [ "ntfs" ];

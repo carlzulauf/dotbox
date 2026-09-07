@@ -13,6 +13,9 @@
 #   -u, --upgrade, --update     Update flake.lock and rebuild
 #   -r, --rebuild               Run nixos-rebuild after copying configs
 #       --no-rebuild            Disable rebuild (overrides other settings)
+#   -g, --gc[=SPEC]             Run cleanup-nixos after a successful rebuild.
+#                               SPEC must be attached (--gc=30d, -g+3); with no
+#                               SPEC, cleanup-nixos uses configurationLimit.
 #       --build-host=HOST       Remote builder for derivation evaluation
 #       --nax                   Shorthand for --build-host=nax
 #       --hostname              Specify machine to build (default: `hostname`)
@@ -28,6 +31,7 @@
 #   - rsync
 #   - nix (flake commands)
 #   - sudo access (configurable via --use-sudo/--no-use-sudo if needed)
+#   - cleanup-nixos (home/.local/bin), only when --gc is used
 
 require 'optparse'
 
@@ -37,6 +41,7 @@ class Script
       use_sudo:     true,
       upgrade:      false,
       rebuild:      false,
+      gc:           nil, # nil, :auto, or a spec for cleanup-nixos, e.g. "+5"
       build_host:   nil, # remote host to build on
       rebuild_type: "boot",
       install_path: "/etc/nixos",
@@ -53,6 +58,12 @@ class Script
     `hostname`.strip
   end
 
+  # Prefer the copy in this repo so --gc works before dotfiles are installed.
+  def self.cleanup_nixos_bin
+    local = File.expand_path(File.join(File.dirname(__FILE__), "..", "home", ".local", "bin", "cleanup-nixos"))
+    File.exist?(local) ? local : "cleanup-nixos"
+  end
+
   def self.start(argv)
     new(argv).()
   end
@@ -66,6 +77,7 @@ class Script
   def call
     copy_nix_files
     nixos_rebuild
+    collect_garbage
   end
 
   def run(*cmd, sudo: false)
@@ -119,6 +131,31 @@ class Script
     run "cp", File.join(install_path, "flake.lock"), File.join(config_dir, "flake.lock")
   end
 
+  # Runs last: the rebuild has already added a generation, so trimming to the
+  # newest N here leaves exactly N with boot entries. cleanup-nixos sudos itself.
+  #
+  # That rebuild also left the ESP holding exactly configurationLimit entries,
+  # which is what a bare --gc trims to -- so the generations it deletes have no
+  # entries left to strand. Anything else (a tighter SPEC, or no rebuild at all)
+  # can strand them, and needs cleanup-nixos to reinstall the boot loader.
+  def collect_garbage
+    return if gc.nil?
+
+    reconciled = rebuild && gc == :auto
+    parts = [
+      self.class.cleanup_nixos_bin,
+      reconciled ? nil : "--boot-sync",
+      gc == :auto ? nil : gc,
+    ].compact
+
+    unless rebuild
+      puts "Collect garbage: $ #{parts.join(' ')}"
+      return
+    end
+
+    run(*parts)
+  end
+
   def parse_options(argv)
     {}.tap do |parsed|
       remainders = OptionParser.new do |op|
@@ -133,6 +170,11 @@ class Script
 
         op.on("--no-rebuild", "Do not rebuild nixos after installing configs. Overrides any other setting.") do
           parsed[:rebuild] = false
+        end
+
+        # SPEC must be attached (--gc=30d, -g+3); bare --gc defers to configurationLimit.
+        op.on("--gc[=SPEC]", "-g", "Run cleanup-nixos after a successful rebuild. Defaults to configurationLimit.") do |spec|
+          parsed[:gc] = spec || :auto
         end
 
         op.on("--switch", "-s", "Run nixos-rebuild in 'switch' mode to immediately switch to generation after building") do

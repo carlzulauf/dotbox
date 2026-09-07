@@ -109,6 +109,7 @@ NixOS's `nixos-rebuild` expects its config at `/etc/nixos/` by default.
 | `--build-host=HOST` | Build on arbitrary remote host |
 | `--hostname` | Specify machine to build (default: `hostname`) |
 | `--no-use-sudo` | Skip sudo for copy operations |
+| `--gc[=SPEC]` / `-g` | Run `cleanup-nixos` after a successful rebuild. SPEC must be attached (`--gc=30d`, `-g+3`); bare `--gc` defers to `configurationLimit`. |
 
 **⚠️ Agent warning**: Never run `nix build`, `nix flake`, or `nixos-rebuild`
 directly from the `nix/` directory. Inform the user to run `bin/install_nix`, or
