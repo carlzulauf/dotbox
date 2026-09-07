@@ -31,5 +31,6 @@
   // Used only by workspaces that set rubyLsp.rubyVersionManager to "custom".
   // This setting is machine-scoped (global), so the per-project logic lives in
   // the fish function instead: ~/.config/fish/functions/ruby_lsp_activate.fish
-  "rubyLsp.customRubyCommand": "ruby_lsp_activate"
+  "rubyLsp.customRubyCommand": "ruby_lsp_activate",
+  "rewrap.wrappingColumn": 80
 }
