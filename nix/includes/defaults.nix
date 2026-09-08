@@ -165,10 +165,23 @@ in
         builtins.concatStringsSep "\n" sortedUnique;
 
     networking.networkmanager.enable = true;
+
+    # NixOS doesn't ship with this config, so Gnome labels connections with "?"
+    # since they can't be verified. Adding this configuration and pointing at a
+    # URL I control allows this question mark to go away if I can connect to the
+    # broader internet and my main server is up and DNS works, so seeing a "?"
+    # will represent a real problem connecting to my distributed network that I
+    # should investigate.
+    networking.networkmanager.settings.connectivity = {
+      uri = "https://exalog.mrks.io/network_manager_check";
+      response = "NetworkManager is online";
+    };
     # needed to make wireguard connections work:
     networking.firewall.checkReversePath = "loose";
+
     # needed for tailscale to work, and probably better
     services.resolved.enable = true;
+
     # Nix daemon config
     nix = {
       # Automate garbage collection
