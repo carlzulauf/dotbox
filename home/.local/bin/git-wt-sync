@@ -1,0 +1,164 @@
+#!/usr/bin/env ruby
+
+# git wt-sync
+# -----------
+# Populate the gitignored local config a worktree needs, from the known-good
+# copies in the repo's MAIN worktree.
+#
+# More info: git wt-sync -h
+#
+# Reads a manifest from $GIT_COMMON_DIR/wt-sync.conf, so it lives in the shared
+# .git dir: one list per repo, visible from every worktree, never committed.
+# No-ops in the main worktree, and never clobbers an existing file unless
+# --force. Safe to run from a post-checkout hook.
+
+require "fileutils"
+require "optparse"
+
+class WorktreeSync
+  Entry = Struct.new(:mode, :pattern)
+
+  attr_reader :dry_run, :force, :verbose
+
+  def initialize(dry_run: false, force: false, verbose: false)
+    @dry_run = dry_run
+    @force = force
+    @verbose = verbose
+  end
+
+  def perform
+    return say("Not inside a work tree; nothing to do.") unless worktree
+    if worktree == main_worktree
+      return say("#{worktree} is the main worktree; nothing to sync.")
+    end
+    return say("No manifest at #{manifest_path}; nothing to sync.") unless entries
+
+    entries.each { |entry| sync(entry) }
+    puts "#{dry_run ? '(dry run) ' : ''}#{@linked.to_i} linked, " \
+         "#{@copied.to_i} copied, #{@skipped.to_i} left alone."
+  end
+
+  private
+
+  def sync(entry)
+    sources(entry).each do |source|
+      relative = source.delete_prefix("#{main_worktree}/")
+      target = File.join(worktree, relative)
+
+      if File.symlink?(target) && File.readlink(target) == source
+        @skipped = @skipped.to_i + 1
+        say("  ok      #{relative} (already linked)")
+      elsif (File.symlink?(target) || File.exist?(target)) && !force
+        @skipped = @skipped.to_i + 1
+        say("  skip    #{relative} (exists)")
+      else
+        place(entry.mode, source, target, relative)
+      end
+    end
+  end
+
+  def place(mode, source, target, relative)
+    unless dry_run
+      FileUtils.mkdir_p(File.dirname(target))
+      FileUtils.rm_f(target)
+      if mode == :link
+        File.symlink(source, target)
+      else
+        FileUtils.cp(source, target, preserve: true)
+      end
+    end
+
+    if mode == :link
+      @linked = @linked.to_i + 1
+      puts "  link    #{relative} -> #{source}"
+    else
+      @copied = @copied.to_i + 1
+      puts "  copy    #{relative}"
+    end
+  end
+
+  # Globs expand against the main worktree: it defines what "known good" means.
+  def sources(entry)
+    matches = Dir.glob(File.join(main_worktree, entry.pattern)).select { |p| File.file?(p) }.sort
+    if matches.empty?
+      say("  absent  #{entry.pattern} (not in #{main_worktree})")
+    end
+    matches
+  end
+
+  def entries
+    return @entries if defined?(@entries)
+
+    @entries =
+      if File.exist?(manifest_path)
+        File.readlines(manifest_path, chomp: true).filter_map do |line|
+          line = line.sub(/#.*/, "").strip
+          next if line.empty?
+
+          mode, pattern = line.split(/\s+/, 2)
+          if pattern.nil?
+            Entry.new(:copy, mode) # bare path: copy is the safe default
+          else
+            Entry.new(mode.to_sym, pattern)
+          end
+        end
+      end
+  end
+
+  def manifest_path
+    @manifest_path ||= File.join(git("rev-parse --path-format=absolute --git-common-dir"), "wt-sync.conf")
+  end
+
+  # First entry of `worktree list` is always the main worktree.
+  def main_worktree
+    @main_worktree ||= git("worktree list --porcelain")[/^worktree (.+)$/, 1]
+  end
+
+  def worktree
+    return @worktree if defined?(@worktree)
+
+    @worktree = git("rev-parse --show-toplevel")
+    @worktree = nil if @worktree.empty?
+    @worktree
+  end
+
+  def git(args)
+    `git #{args} 2>/dev/null`.strip
+  end
+
+  def say(message)
+    puts message if verbose
+    nil
+  end
+
+  def self.parse(args)
+    options = {}
+    parser = OptionParser.new do |o|
+      o.banner = <<~BANNER
+        Usage: git wt-sync [options]
+
+        Copies or symlinks the gitignored local config listed in
+        $GIT_COMMON_DIR/wt-sync.conf from the main worktree into this one.
+
+        Manifest format -- one path per line, `#` comments, globs allowed:
+
+          link config/master.key        # shared: edit once, every worktree sees it
+          link config/credentials/*.key
+          copy .env.local.overrides     # per-worktree: give this branch its own DB/port
+          .env.local.overrides          # bare path means copy
+
+        Options:
+      BANNER
+
+      o.on("-n", "--dry-run", "Show what would be synced, change nothing") { options[:dry_run] = true }
+      o.on("-f", "--force", "Replace files that already exist in this worktree") { options[:force] = true }
+      o.on("-v", "--verbose", "Also report what was skipped and why") { options[:verbose] = true }
+      o.on("-h", "--help", "The thing you probably just ran") { puts o; exit }
+    end
+
+    parser.parse!(args)
+    new(**options)
+  end
+end
+
+WorktreeSync.parse(ARGV).perform
