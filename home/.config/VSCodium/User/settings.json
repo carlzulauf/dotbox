@@ -32,5 +32,10 @@
   // This setting is machine-scoped (global), so the per-project logic lives in
   // the fish function instead: ~/.config/fish/functions/ruby_lsp_activate.fish
   "rubyLsp.customRubyCommand": "ruby_lsp_activate",
-  "rewrap.wrappingColumn": 80
+  "rewrap.wrappingColumn": 80,
+  "[ruby]": {
+    // turn off when doing merge conflicts to avoid unrelated changes
+    "editor.formatOnSave": true,
+    "editor.formatOnType": true
+  }
 }
