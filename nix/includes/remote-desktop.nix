@@ -23,6 +23,17 @@
 # it they have no credentials and refuse every connection. Plasma's krdp
 # ignores it and checks the real account password through PAM instead.
 #
+# Sharing a live session needs that session unlocked: mutter closes and
+# refuses screen-share sessions while the lock screen is up ("Session
+# creation inhibited"), so an idle machine stops answering on 3390 - which is
+# exactly when it's usually being connected to. The Allow Locked Remote
+# Desktop extension installed below lifts that restriction (it runs in the
+# "unlock-dialog" session mode); connecting to a locked host then shows its
+# lock screen, which still wants the account password. It has to be enabled
+# by hand once per machine. Until it is, a locked host can be opened up with:
+#
+#   ssh -t <host> sudo loginctl unlock-session <id>   # id from loginctl
+#
 # VNC is not used: it is slower, and gnome-remote-desktop only offers
 # password auth for it in screen-share mode, with no Remote Login. SPICE is a
 # QEMU guest protocol with no server for a physical desktop.
@@ -108,15 +119,13 @@ in
       services.gnome.gnome-remote-desktop.enable = true;
       networking.firewall.interfaces.${tailnet}.allowedTCPPorts = [ loginPort ];
 
-      # Mutter closes and refuses screen-share sessions whenever the lock
-      # screen is up ("Session creation inhibited", meta-dbus-session-manager.c),
-      # so sharing the live session stops working as soon as a machine idles
-      # out - which is exactly when it is being connected to from elsewhere.
-      # This extension lifts that restriction; it declares the "unlock-dialog"
-      # session mode, which is what allows it to keep running while locked.
-      # Connecting to a locked host then shows its lock screen, which still
-      # demands the account password, so remote access is no easier than
-      # walking up to the machine.
+      # Installed, but left switched off: enable it by hand once per machine,
+      # like the other extensions. Nothing here can do it, because gnome-shell
+      # only scans for extensions when it starts, so a freshly installed one
+      # doesn't exist as far as any tool or setting is concerned until the
+      # next login anyway. See the header for why it is worth turning on.
+      #
+      #   gnome-extensions enable allowlockedremotedesktop@kamens.us
       environment.systemPackages = [ pkgs.gnomeExtensions.allow-locked-remote-desktop ];
 
       # --- 3389: Remote Login (system daemon) ---
@@ -139,7 +148,6 @@ in
         description = "Seed GNOME Remote Desktop TLS certificate and RDP credentials";
         wantedBy = [ "graphical.target" ];
         before = [ "gnome-remote-desktop.service" ];
-        after = [ "dbus.service" ];
         path = [ pkgs.openssl pkgs.gnome-remote-desktop pkgs.util-linux ];
         serviceConfig = {
           Type = "oneshot";
@@ -205,7 +213,7 @@ in
         wantedBy = [ "gnome-session.target" ];
         before = [ "gnome-remote-desktop.service" ];
         unitConfig.ConditionPathExists = "%h/.config/remote-desktop/rdp-password";
-        path = [ pkgs.openssl pkgs.gnome-remote-desktop pkgs.glib ];
+        path = [ pkgs.openssl pkgs.gnome-remote-desktop ];
         serviceConfig = {
           Type = "oneshot";
           RemainAfterExit = true;
@@ -220,28 +228,6 @@ in
           grdctl rdp disable-view-only
           grdctl rdp set-credentials "$USER" "$(< "$HOME/.config/remote-desktop/rdp-password")"
           grdctl rdp enable
-
-          # Enabled by editing the user's own list, because a system dconf
-          # default is overridden by that list, which exists on any machine
-          # with an extension turned on.
-          #
-          # Not `gnome-extensions enable`: that asks the running gnome-shell,
-          # which only scans for extensions at startup and so does not know
-          # about one a later rebuild installed ("Extension ... does not
-          # exist", exit 2). The setting can be written before the shell has
-          # ever seen the extension; it takes effect when the shell next
-          # starts, which on Wayland means the next login. Non-fatal on
-          # purpose: a remote-unlock convenience must not fail activation.
-          uuid=${pkgs.gnomeExtensions.allow-locked-remote-desktop.extensionUuid}
-          enabled=$(gsettings get org.gnome.shell enabled-extensions)
-          if [[ "$enabled" != *"$uuid"* ]]; then
-            case "$enabled" in
-              "@as []"|"[]") new="['$uuid']" ;;
-              *) new="''${enabled%]}, '$uuid']" ;;
-            esac
-            gsettings set org.gnome.shell enabled-extensions "$new" \
-              || echo "warning: could not add $uuid to enabled-extensions" >&2
-          fi
         '';
       };
     })
