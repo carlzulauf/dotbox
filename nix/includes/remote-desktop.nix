@@ -108,6 +108,17 @@ in
       services.gnome.gnome-remote-desktop.enable = true;
       networking.firewall.interfaces.${tailnet}.allowedTCPPorts = [ loginPort ];
 
+      # Mutter closes and refuses screen-share sessions whenever the lock
+      # screen is up ("Session creation inhibited", meta-dbus-session-manager.c),
+      # so sharing the live session stops working as soon as a machine idles
+      # out - which is exactly when it is being connected to from elsewhere.
+      # This extension lifts that restriction; it declares the "unlock-dialog"
+      # session mode, which is what allows it to keep running while locked.
+      # Connecting to a locked host then shows its lock screen, which still
+      # demands the account password, so remote access is no easier than
+      # walking up to the machine.
+      environment.systemPackages = [ pkgs.gnomeExtensions.allow-locked-remote-desktop ];
+
       # --- 3389: Remote Login (system daemon) ---
 
       # The daemon reads these four keys and nothing else from grd.conf.
@@ -194,7 +205,7 @@ in
         wantedBy = [ "gnome-session.target" ];
         before = [ "gnome-remote-desktop.service" ];
         unitConfig.ConditionPathExists = "%h/.config/remote-desktop/rdp-password";
-        path = [ pkgs.openssl pkgs.gnome-remote-desktop ];
+        path = [ pkgs.openssl pkgs.gnome-remote-desktop pkgs.gnome-shell ];
         serviceConfig = {
           Type = "oneshot";
           RemainAfterExit = true;
@@ -209,6 +220,12 @@ in
           grdctl rdp disable-view-only
           grdctl rdp set-credentials "$USER" "$(< "$HOME/.config/remote-desktop/rdp-password")"
           grdctl rdp enable
+
+          # Enabled here rather than from a dconf default, because the user's
+          # own enabled-extensions list (which exists on every machine with
+          # any extension turned on) overrides a system default entirely.
+          # This edits that user list, and the shell acts on it immediately.
+          gnome-extensions enable ${pkgs.gnomeExtensions.allow-locked-remote-desktop.extensionUuid}
         '';
       };
     })
