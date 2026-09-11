@@ -205,7 +205,7 @@ in
         wantedBy = [ "gnome-session.target" ];
         before = [ "gnome-remote-desktop.service" ];
         unitConfig.ConditionPathExists = "%h/.config/remote-desktop/rdp-password";
-        path = [ pkgs.openssl pkgs.gnome-remote-desktop pkgs.gnome-shell ];
+        path = [ pkgs.openssl pkgs.gnome-remote-desktop pkgs.glib ];
         serviceConfig = {
           Type = "oneshot";
           RemainAfterExit = true;
@@ -221,11 +221,27 @@ in
           grdctl rdp set-credentials "$USER" "$(< "$HOME/.config/remote-desktop/rdp-password")"
           grdctl rdp enable
 
-          # Enabled here rather than from a dconf default, because the user's
-          # own enabled-extensions list (which exists on every machine with
-          # any extension turned on) overrides a system default entirely.
-          # This edits that user list, and the shell acts on it immediately.
-          gnome-extensions enable ${pkgs.gnomeExtensions.allow-locked-remote-desktop.extensionUuid}
+          # Enabled by editing the user's own list, because a system dconf
+          # default is overridden by that list, which exists on any machine
+          # with an extension turned on.
+          #
+          # Not `gnome-extensions enable`: that asks the running gnome-shell,
+          # which only scans for extensions at startup and so does not know
+          # about one a later rebuild installed ("Extension ... does not
+          # exist", exit 2). The setting can be written before the shell has
+          # ever seen the extension; it takes effect when the shell next
+          # starts, which on Wayland means the next login. Non-fatal on
+          # purpose: a remote-unlock convenience must not fail activation.
+          uuid=${pkgs.gnomeExtensions.allow-locked-remote-desktop.extensionUuid}
+          enabled=$(gsettings get org.gnome.shell enabled-extensions)
+          if [[ "$enabled" != *"$uuid"* ]]; then
+            case "$enabled" in
+              "@as []"|"[]") new="['$uuid']" ;;
+              *) new="''${enabled%]}, '$uuid']" ;;
+            esac
+            gsettings set org.gnome.shell enabled-extensions "$new" \
+              || echo "warning: could not add $uuid to enabled-extensions" >&2
+          fi
         '';
       };
     })
