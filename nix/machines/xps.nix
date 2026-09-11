@@ -18,6 +18,9 @@
   # Allow rootless containers to bind ports 80+ (needed for dokku, nginx, etc.)
   boot.kernel.sysctl."net.ipv4.ip_unprivileged_port_start" = 80;
 
+  # Default is for 512MB /boot, but this one is 1GB
+  boot.loader.systemd-boot.configurationLimit = 10;
+
   # these customizations should make it into nixos-hardware
   services.fwupd.enable = true;
   services.fprintd.enable = true; # https://github.com/NixOS/nixos-hardware/pull/1835
