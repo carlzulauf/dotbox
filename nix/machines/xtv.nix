@@ -53,11 +53,6 @@
     };
   };
 
-  services.gnome.gnome-remote-desktop.enable = true;
-  systemd.services.gnome-remote-desktop = {
-    wantedBy = [ "graphical.target" ];
-  };
-
   # ──────────────────────────────────────────────────────────────────
   # Audio: prefer HDMI/DisplayPort over S/PDIF as default output
   # ──────────────────────────────────────────────────────────────────

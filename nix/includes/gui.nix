@@ -1,6 +1,9 @@
 { config, pkgs, lib, ... }:
 
 {
+  # RDP between machines over the tailnet; picks GNOME or Plasma backends itself
+  imports = [ ./remote-desktop.nix ];
+
   environment.systemPackages = with pkgs; [
     firefox firefox-devedition
     google-chrome chromium brave

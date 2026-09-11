@@ -12,6 +12,7 @@ This repository manages infrastructure for multiple NixOS systems (desktops, lap
     *   `defaults.nix`: Global settings (fish shell, network-manager, nix-ld).
     *   `carl.nix`: User account setup and service credentials (Syncthing, etc.).
     *   `dev.nix`, `gui.nix`, `gnome.nix`: Feature sets for different usage profiles.
+    *   `remote-desktop.nix` (imported by `gui.nix`): RDP over the tailnet. Port 3390 shares the live session, 3389 is GNOME Remote Login; `rdp <host>` picks one.
 
 ### The Installer (`bin/install_nix`)
 The script `bin/install_nix` automates the deployment process:
