@@ -157,6 +157,27 @@ in
   hardware.steam-hardware.enable = true;
   programs.steam = {
     enable = true;
+
+    # frix is the Remote Play host, running GNOME on Wayland. Two separate
+    # problems stop that from working hands-off:
+    #
+    # Video: without -pipewire Steam has no way to capture a Wayland desktop.
+    # It warns "Desktop capture unavailable, try running Steam with -pipewire"
+    # and streams "Desktop Black Frame" (see logs/streaming_log.txt), which is
+    # a black screen on the client with working audio and input. With it,
+    # Steam opens a ScreenCast portal session when it starts, and asks for a
+    # persistent grant (persist_mode/restore_token), so after the first
+    # "Share" later starts should not prompt.
+    package = pkgs.steam.override { extraArgs = "-pipewire"; };
+
+    # Input: Steam injects streamed keyboard/mouse through XTest. Mutter always
+    # starts Xwayland with -enable-ei-portal, which turns an XTest client into
+    # a RemoteDesktop portal request ("Allow Remote Interaction"). Xwayland
+    # never asks for persistence, so the approval is forgotten and has to be
+    # given at the desk. extest reimplements XTest on /dev/uinput (uaccess'd by
+    # steam-hardware) so the portal is never involved.
+    extest.enable = true;
+
     remotePlay.openFirewall = true;
     dedicatedServer.openFirewall = true;
     localNetworkGameTransfers.openFirewall = true;
