@@ -129,7 +129,7 @@ in
         wantedBy = [ "graphical.target" ];
         before = [ "gnome-remote-desktop.service" ];
         after = [ "dbus.service" ];
-        path = [ pkgs.openssl pkgs.gnome-remote-desktop ];
+        path = [ pkgs.openssl pkgs.gnome-remote-desktop pkgs.util-linux ];
         serviceConfig = {
           Type = "oneshot";
           RemainAfterExit = true;
@@ -139,19 +139,31 @@ in
           ${makeCert grdStateDir}
           chown gnome-remote-desktop:gnome-remote-desktop ${grdStateDir}/rdp-tls.key ${grdStateDir}/rdp-tls.crt
 
-          # Stored in the TPM, or credentials.ini where there is none. grdctl
-          # segfaults reading them from a non-tty stdin, so they go as
-          # arguments; that exposes them in the process list for the moment
-          # this runs.
+          # Credentials live in the TPM, or in credentials.ini where there is
+          # none. They go to grdctl as arguments because it segfaults reading
+          # them from a non-tty stdin; that exposes them in the process list
+          # for the moment this runs.
+          #
+          # Not `grdctl --system`: that re-runs itself as
+          # `pkexec --user gnome-remote-desktop grdctl ...`, which fails here
+          # with "Failed to execute child process pkexec" (the setuid wrapper
+          # dir isn't on a unit's PATH) and would then depend on polkit
+          # authorising a root caller with no agent. grdctl already selects
+          # system mode when its own euid is the daemon's user
+          # (grd-ctl.c: `geteuid () == pw->pw_uid`), so becoming that user
+          # first does the same work with no polkit involved. HOME must be set
+          # explicitly: grdctl stores credentials under $HOME/.local/share,
+          # and root's HOME would put them where the daemon never looks.
           if [ -r ${passwordFile} ]; then
-            grdctl --system rdp set-credentials ${user} "$(< ${passwordFile})"
+            runuser -u gnome-remote-desktop -- \
+              env HOME=${grdStateDir} grdctl rdp set-credentials ${user} "$(< ${passwordFile})"
           else
             echo "${passwordFile} is missing: Remote Login will refuse all connections" >&2
           fi
 
-          # `grdctl --system` writes settings to this local-state file, which
-          # overrides /etc/gnome-remote-desktop/grd.conf. Drop it so anything
-          # set via grdctl or GNOME Settings can't shadow the config above.
+          # grdctl and GNOME Settings write settings to this local-state file,
+          # which overrides /etc/gnome-remote-desktop/grd.conf. Drop it so
+          # neither can shadow the config above.
           rm -f ${grdStateDir}/.local/share/gnome-remote-desktop/grd.conf
         '';
       };
