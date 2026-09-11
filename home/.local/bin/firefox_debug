@@ -1,0 +1,114 @@
+#!/usr/bin/env ruby
+
+# firefox_debug
+# -------------
+# Start firefox with the remote debugging port open, using a dedicated profile
+# dir so it doesn't fight with (or leak into) a normal browsing profile.
+#
+#     firefox_debug                                  # firefox on :9223
+#     firefox_debug -p 9333                          # different port
+#     firefox_debug -e firefox-devedition            # different browser
+#     firefox_debug -d ~/.config/firefox-unabridged  # different profile dir
+#     firefox_debug -- https://localhost             # extra args go to the browser
+#
+# Note that firefox speaks WebDriver BiDi here, not the Chrome DevTools
+# Protocol, so the endpoint is a websocket (ws://127.0.0.1:9222) and there is no
+# http://127.0.0.1:9222/json to poke at. Firefox prints the exact ws:// URL on
+# startup; with -p 0 it picks a free port and writes it to
+# WebDriverBiDiServer.json in the profile dir instead.
+#
+# If a client is rejected with an origin/host error, pass firefox's escape
+# hatches through: firefox_debug -- --remote-allow-origins=http://localhost:3000
+#
+# More info: firefox_debug -h
+
+require "optparse"
+require "fileutils"
+
+DEFAULT_PORT = 9223
+DEFAULT_DIR  = "~/.config/firefox-debug"
+DEFAULT_EXE  = "firefox"
+
+# Chromium takes --no-first-run and --no-default-browser-check on the command
+# line; firefox only has prefs. Written once, when the profile is created, so
+# it stays editable afterwards.
+FIRST_RUN_PREFS = <<~PREFS
+  user_pref("browser.shell.checkDefaultBrowser", false);
+  user_pref("browser.startup.homepage_override.mstone", "ignore");
+  user_pref("browser.aboutwelcome.enabled", false);
+  user_pref("datareporting.policy.dataSubmissionPolicyBypassNotification", true);
+PREFS
+
+class Script < Struct.new(:options, :extra_args)
+  def self.parse_options(argv)
+    options = {
+      port: DEFAULT_PORT,
+      dir: File.expand_path(DEFAULT_DIR),
+      exe: DEFAULT_EXE,
+    }
+
+    OptionParser.new do |op|
+      op.banner = "Usage: firefox_debug [options] [-- browser args]"
+
+      op.on("-p PORT", "--port PORT", Integer, "Remote debugging port. Default is #{DEFAULT_PORT}.") do |port|
+        options[:port] = port
+      end
+
+      op.on("-d DIR", "--profile-dir DIR", "Browser profile dir. Default is #{DEFAULT_DIR}") do |dir|
+        options[:dir] = File.expand_path(dir)
+      end
+
+      op.on("-e EXE", "--exe EXE", "Browser executable to run. Default is #{DEFAULT_EXE}.") do |exe|
+        options[:exe] = exe
+      end
+
+      op.on("-h", "--help") do
+        puts op
+        exit
+      end
+    end.parse!(argv)
+
+    self.new options, argv
+  end
+
+  def call
+    abort "Could not find '#{options[:exe]}' on your PATH." unless which(options[:exe])
+
+    seed_profile
+
+    puts "Starting #{options[:exe]} with remote debugging (WebDriver BiDi) on ws://127.0.0.1:#{options[:port]}"
+    puts "Profile: #{options[:dir]}", nil
+    puts "$ #{cmd.join(' ')}"
+
+    $stdout.flush
+    exec(*cmd)
+  end
+
+  def cmd
+    [
+      options[:exe],
+      "--remote-debugging-port=#{options[:port]}",
+      "--profile", options[:dir],
+      "--no-remote",
+    ] + extra_args
+  end
+
+  # --no-remote keeps this out of an already-running firefox, but only a profile
+  # firefox has never opened is guaranteed to be unlocked, hence the dedicated dir.
+  def seed_profile
+    fresh = !File.directory?(options[:dir])
+    FileUtils.mkpath(options[:dir])
+
+    prefs = File.join(options[:dir], "user.js")
+    File.write(prefs, FIRST_RUN_PREFS) if fresh && !File.exist?(prefs)
+  end
+
+  def which(exe)
+    ENV.fetch("PATH", "").split(File::PATH_SEPARATOR).any? do |dir|
+      path = File.join(dir, exe)
+      File.executable?(path) && !File.directory?(path)
+    end
+  end
+end
+
+Script.parse_options(ARGV).()
