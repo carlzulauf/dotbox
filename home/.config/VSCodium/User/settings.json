@@ -33,6 +33,17 @@
   // the fish function instead: ~/.config/fish/functions/ruby_lsp_activate.fish
   "rubyLsp.customRubyCommand": "ruby_lsp_activate",
   "rewrap.wrappingColumn": 80,
+  // Code Spell Checker (streetsidesoftware.code-spell-checker), pinned in
+  // nix/includes/gui.nix. Default is to check every file type, which is noisy
+  // in code, so opt in per language instead.
+  "cSpell.checkOnlyEnabledFileTypes": true,
+  "cSpell.enabledFileTypes": {
+    "*": false,
+    "markdown": true,
+    "plaintext": true,
+    "git-commit": true
+  },
+  "cSpell.userWords": [],
   "[ruby]": {
     // turn off when doing merge conflicts to avoid unrelated changes
     "editor.formatOnSave": true,
