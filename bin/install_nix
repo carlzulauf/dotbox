@@ -16,7 +16,10 @@
 #   -g, --gc[=SPEC]             Run cleanup-nixos after a successful rebuild.
 #                               SPEC must be attached (--gc=30d, -g+3); with no
 #                               SPEC, cleanup-nixos uses configurationLimit.
-#       --build-host=HOST       Remote builder for derivation evaluation
+#       --build-host=HOST       Remote builder for derivation evaluation.
+#                               Connects as the invoking user (no root login
+#                               needed); HOST just has to have that user in its
+#                               nix.settings.trusted-users.
 #       --nax                   Shorthand for --build-host=nax
 #       --hostname              Specify machine to build (default: `hostname`)
 #   -h, --help                  Show this help message
@@ -107,6 +110,19 @@ class Script
     end
   end
 
+  # `sudo nixos-rebuild` causes --build-host to ssh as root, which means /root
+  # has to have ssh keys accepted by root@{build-host}, which is not ideal.
+  #
+  # When --build-host is present, we now run the command without sudo, but
+  # --elevate=sudo --ask-elevate-password, so `nixos-rebuild` elevates as needed
+  # to activate the newly built generation (via sudo), and ask the password
+  # upfront so we hopefully don't timeout. The ssh to the build-host happens as
+  # the current user, and the build host will still build to its store if the
+  # user is in nix.settings.trusted-users
+  def delegate_elevation?
+    !build_host.nil? && use_sudo
+  end
+
   def nixos_rebuild
     if upgrade
       run "nix", "flake", "update", "--flake", install_path, sudo: use_sudo
@@ -114,13 +130,15 @@ class Script
 
     cmd_options = ["--log-format", "bar-with-logs", "--flake", "/etc/nixos##{host}"]
     cmd_options << "--build-host" << build_host if build_host
+    cmd_options << "--elevate=sudo" << "--ask-elevate-password" if delegate_elevation?
     rebuild_cmd = ["nixos-rebuild", *cmd_options, rebuild_type]
+    rebuild_sudo = use_sudo && !delegate_elevation?
 
     if rebuild
-      run(*rebuild_cmd, sudo: use_sudo)
+      run(*rebuild_cmd, sudo: rebuild_sudo)
     else
       puts "Update flake: #{use_sudo ? '#' : '$'} nix flake update --flake #{install_path}"
-      puts "Rebuild NixOS: #{use_sudo ? '#' : '$'} #{rebuild_cmd.join(' ')}"
+      puts "Rebuild NixOS: #{rebuild_sudo ? '#' : '$'} #{rebuild_cmd.join(' ')}"
     end
 
     # capture the successful lock file if we get this far
