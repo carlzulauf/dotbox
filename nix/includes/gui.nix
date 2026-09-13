@@ -1,5 +1,23 @@
 { config, pkgs, lib, ... }:
 
+let
+  # Not packaged in nixpkgs, so pin the .vsix straight from Open VSX (the
+  # marketplace VSCodium itself uses). Bump version + hash together; get the
+  # new hash with:
+  #   nix-prefetch-url <url> | xargs nix hash convert --hash-algo sha256
+  toggle-quotes = pkgs.vscode-utils.buildVscodeMarketplaceExtension {
+    mktplcRef = {
+      publisher = "britesnow";
+      name = "vscode-toggle-quotes";
+      version = "0.3.6";
+    };
+    vsix = pkgs.fetchurl {
+      url = "https://open-vsx.org/api/britesnow/vscode-toggle-quotes/0.3.6/file/britesnow.vscode-toggle-quotes-0.3.6.vsix";
+      hash = "sha256-FNn82+YOUpYb/wABL79HUx1/LN9GJAYBUKYmz4O0Er8=";
+    };
+  };
+in
+
 {
   # RDP between machines over the tailnet; picks GNOME or Plasma backends itself
   imports = [ ./remote-desktop.nix ];
@@ -18,12 +36,13 @@
     cpu-x
     (vscode-with-extensions.override {
       vscode = vscodium;
-      vscodeExtensions = with vscode-extensions; [
+      vscodeExtensions = (with vscode-extensions; [
         continue.continue
         jnoortheen.nix-ide
         shopify.ruby-lsp
         stkb.rewrap
-      ];
+        streetsidesoftware.code-spell-checker
+      ]) ++ [ toggle-quotes ];
     })
   ];
 
