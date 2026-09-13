@@ -1,4 +1,4 @@
-{ config, pkgs, nixos-hardware, nixarr, ... }:
+{ config, pkgs, nixos-hardware, ... }:
 
 {
   # old system76 laptop with 8550u
