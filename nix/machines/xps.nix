@@ -43,6 +43,29 @@
     };
   };
 
+  # Built-in mics are digital, wired to the rt714 codec's DMIC1/DMIC2 pins, but
+  # the rt715-sdca driver powers up with ADC 22/23 muxed to the analog MIC1/MIC2
+  # pins, which have nothing attached -- capture then yields a flat ~-60 dBFS
+  # noise floor while a Bluetooth headset mic still works fine.  Upstream's UCM
+  # profile only toggles the FU02 capture switch and never touches the muxes, so
+  # extend the Mic enable sequence to point the ADCs at the digital mics.
+  # alsa-lib symlinks its share/alsa/ucm2 into this package, so overriding it
+  # reaches PipeWire.
+  nixpkgs.overlays = [
+    (_final: prev: {
+      alsa-ucm-conf = prev.alsa-ucm-conf.overrideAttrs (old: {
+        postInstall = (old.postInstall or "") + ''
+          substituteInPlace $out/share/alsa/ucm2/sof-soundwire/rt715-sdca.conf \
+            --replace-fail \
+              "cset \"name='rt714 FU02 Capture Switch' 1\"" \
+              "cset \"name='rt714 FU02 Capture Switch' 1\"
+		cset \"name='rt714 ADC 22 Mux' DMIC1\"
+		cset \"name='rt714 ADC 23 Mux' DMIC2\""
+        '';
+      });
+    })
+  ];
+
   services.puma-dev = {
     enable = true;
     user = "carl";
