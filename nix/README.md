@@ -1,6 +1,6 @@
 # NixOS Configuration Repository
 
-This repository manages infrastructure for multiple NixOS systems (desktops, laptops, servers) using **Nix Flakes**. It utilizes a shared configuration structure with machine-specific overrides and host-level home-manager integration.
+This repository manages infrastructure for multiple NixOS systems (desktops, laptops, servers) using **Nix Flakes**. It utilizes a shared configuration structure with machine-specific overrides.
 
 ## 🏗️ Architecture
 
@@ -62,12 +62,12 @@ bin/install_nix --nax   # Shorthand for --build-host nax
 ```
 
 ### Managing Packages & Environment
-The configuration unifies the environment across all hosts using **Home Manager**.
+The configuration unifies the environment across all hosts via `environment.systemPackages`; dotfiles are managed by `bin/install_dotfiles` from `home/` and `home-files/` rather than Home Manager.
 *   **Default Shell**: Fish is set globally.
 *   **Nix Store**: Auto-optimisation and binary substituters (cache.numtide) are enabled by default.
 *   **Development**: Ruby, Node.js, SQL tools, and Terraform are pre-bundled in system packages (`includes/defaults.nix`).
 
 ## 💡 Configuration Tips
-*   **Home Manager**: User-level configuration is split between the global `home-manager.users.carl` definition (in `flake.nix`) and specific module definitions.
+*   **User-level config**: There is no Home Manager. User-facing dotfiles live in `home/` (installed by `bin/install_dotfiles`) and user packages go in `environment.systemPackages`.
 *   **Kernels**: Hardware-specific kernel pinning is handled in individual machine files (e.g., `machines/frix.nix`).
 *   **Unfree Packages**: The config explicitly allows unfree software for things like Electron, Zoom, and GIMP (`allowed := ["pulsar" "electron"...]`).
