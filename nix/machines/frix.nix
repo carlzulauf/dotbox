@@ -239,29 +239,33 @@ in
   # Like ollama/open-webui above it never autostarts — the ~80 GiB model plus
   # ROCm overhead leaves only ~16 GiB headroom, so only one runner at a time.
   #
-  # Settings rationale (measured on this box at ctx=262144: KV 3.72 GiB +
-  # buffers 2.00 GiB + model 80.76 GiB):
-  #   --ctx 393216            Think Max is gated at exactly this context; below
-  #                           it reasoning_effort=max silently drops to high.
-  #                           Costs ~+2.7 GiB over 262144 (V4's compressed
-  #                           attention makes context cheap).
+  # Settings rationale (measured on this box at ctx=393216, prefill_chunk=2048:
+  # KV 5.23 GiB + buffers 1.50 GiB + model 80.76 GiB):
+  #   --ctx 524288            2^19. Think Max needs >= 393216; beyond that the
+  #                           ceiling is the managed-KV threshold below, not
+  #                           RAM. Compressed KV is ~13.1 KiB/token, so this
+  #                           plans KV 6.82 GiB + buffers 1.00 GiB = 7.82 GiB.
+  #                           The model supports 1048576, but that is ~15.5
+  #                           GiB of context and lands on the managed path.
   #   --kv-disk-space-mb      8192 filled up and evicted constantly; there are
   #                           2 TB free on this disk and it costs no RAM.
   #   --kv-cache-cold-max-tokens
   #                           default 30000 means cold prompts past 30k tokens
   #                           are never checkpointed at all, which is most of
   #                           them at this context size.
-  #   --prefill-chunk 2048    keeps context buffers at 6.73 GiB, under the 8 GiB
-  #                           threshold in ds4_gpu_should_use_managed_kv_cache()
-  #                           that would otherwise force the KV cache onto the
-  #                           slower demand-paged managed path at this ctx.
-  #                           Benchmarked (ds4-bench, 16k/32k/64k frontiers):
-  #                           decode 14.57/13.92/13.07 t/s vs 14.15/13.39/12.45
-  #                           on the managed path — and the gap widens with
-  #                           depth. Costs ~4% prefill (164.6 vs 170.0 t/s at
-  #                           64k), which the disk KV cache largely hides on
-  #                           repeated prefixes. Also saves 1.67 GiB, since
-  #                           raw_cap tracks the prefill chunk.
+  #   --prefill-chunk 1024    keeps context buffers (KV + 2*comp_cap*chunk*4B)
+  #                           under the 8 GiB threshold in
+  #                           ds4_gpu_should_use_managed_kv_cache() that would
+  #                           otherwise force the KV cache onto the slower
+  #                           demand-paged managed path; 2048 would be 8.91 GiB
+  #                           at this ctx. At ctx=393216 we benchmarked 2048
+  #                           (ds4-bench, 16k/32k/64k frontiers): decode
+  #                           14.57/13.92/13.07 t/s vs 14.15/13.39/12.45 on the
+  #                           managed path — and the gap widens with depth — for
+  #                           ~4% prefill (164.6 vs 170.0 t/s at 64k). 1024
+  #                           likely costs somewhat more prefill (unmeasured),
+  #                           which the disk KV cache largely hides on
+  #                           repeated prefixes.
   systemd.services.ds4 = {
     description = "DwarfStar (ds4) DeepSeek-V4 inference server";
     after = [ "network.target" ];
@@ -278,8 +282,8 @@ in
       ExecStart = lib.escapeShellArgs [
         "${config.services.ds4.package}/bin/ds4-server"
         "-m" ds4Model
-        "--ctx" "393216"
-        "--prefill-chunk" "2048"
+        "--ctx" "524288"
+        "--prefill-chunk" "1024"
         "--kv-disk-dir" "${ds4Home}/server-kv"
         "--kv-disk-space-mb" "131072"
         "--kv-cache-cold-max-tokens" "250000"
