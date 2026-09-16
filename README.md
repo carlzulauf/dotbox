@@ -52,6 +52,31 @@ You can also create sessions for projects that are not yet configured by supplyi
 tproj mine ~/projects/my_project --windows=5
 ```
 
+#### Worktrees
+
+`-b`/`--worktree` starts the session in a git worktree for the given branch, creating the worktree (and the branch, if it doesn't already exist locally or on a remote) when it isn't there yet:
+
+```
+tproj dotbox --worktree=feature/new-thing
+```
+
+Worktrees default to `tmp/wt/` inside the project directory, one directory per branch. Characters that aren't allowed in a path name — `/` included — become underscores, so `feature/new-thing` lives in `tmp/wt/feature_new-thing` and gets its own tmux session (`feature_new-thing`) alongside the project's main one.
+
+New branches are cut from the repo's primary branch — whatever `origin/HEAD` points at, falling back to a local `main`/`master`/`trunk`, then to the current checkout. Use `--from-ref` to branch from something else:
+
+```
+tproj dotbox -b feature/new-thing --from-ref=origin/release-2
+```
+
+Override the worktree location with `--worktrees-dir`, or per project with a `worktrees_dir` key in `tproj.yml`. Relative paths are resolved against the project directory:
+
+```yaml
+dotbox:
+  abbr: dotb
+  dir: "~/projects/dotbox"
+  worktrees_dir: "~/worktrees/dotbox"
+```
+
 ### `console_saver`
 
 **Requires**: `pry` gem for ruby. Install `ruby-pry` with your package manager or `gem install pry` to run.

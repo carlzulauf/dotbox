@@ -3,17 +3,27 @@
 require "yaml"
 require "open3"
 require "optparse"
+require "fileutils"
 
-# Usage:
+# Use configured projects:
 # tproj <- get a list of available projects (configured below)
 # tproj project-name <- start or resume a specific project
+# tproj project-name -b branch <- same, but in a git worktree for that branch
+#
+# Use ad-hoc projects:
+# tproj ad-hoc-project ~/project/path
 
 # looks in ~/.config/tproj.conf for project configs
 
 $debug = false
 
 class Project
-  OVERWRITEABLE = %w[dir windows start distrobox detach]
+  OVERWRITEABLE = %w[
+    dir
+    windows start distrobox detach
+    worktree worktrees_dir from_ref
+  ]
+  DEFAULT_WORKTREES_DIR = "tmp/wt"
   attr_reader :key, :options
 
   def initialize(key = nil, options)
@@ -27,12 +37,48 @@ class Project
     end
   end
 
-  def dir
+  # the repository/project checkout, ignoring any requested worktree
+  def project_dir
     File.expand_path(options.fetch("dir") { Dir.pwd })
   end
 
+  def dir
+    worktree? ? worktree_dir : project_dir
+  end
+
+  def worktree
+    options["worktree"]
+  end
+
+  def worktree?
+    !worktree.to_s.empty?
+  end
+
+  # relative paths are resolved against the project directory
+  def worktrees_dir
+    configured = options["worktrees_dir"] || DEFAULT_WORKTREES_DIR
+    File.expand_path(configured, project_dir)
+  end
+
+  def worktree_dir
+    File.join(worktrees_dir, path_safe(worktree))
+  end
+
+  # ref a newly created worktree branch starts from
+  def from_ref
+    options["from_ref"]
+  end
+
   def abbr
-    options.fetch("abbr") { rand(0..0xffff).to_s(16) }
+    @abbr ||= options.fetch("abbr") { rand(0..0xffff).to_s(16) }
+  end
+
+  # tmux session name, kept distinct per worktree
+  def session
+    return abbr unless worktree?
+
+    # tmux session names can't have dots (or :, but they don't survive path_safe)
+    path_safe(worktree).tr(".", "_")
   end
 
   def names
@@ -84,6 +130,12 @@ class Project
       "--command tmux", *args
     ].join(" ")
   end
+
+  # branch names may contain characters that are illegal in (or imply nested)
+  # path names, so flatten them all down to underscores
+  def path_safe(name)
+    name.gsub(%r{[^A-Za-z0-9._-]}, "_").sub(/\A[.-]+/) { |run| "_" * run.length }
+  end
 end
 
 def parse_options(argv)
@@ -101,6 +153,18 @@ def parse_options(argv)
 
     op.on("-w WINDOWS", "--windows WINDOWS", Integer, "Number of tmux windows in project") do |windows|
       options["windows"] = [windows, 1].max
+    end
+
+    op.on("-b BRANCH", "--worktree BRANCH", "Create/switch to a git worktree for BRANCH and session it there") do |branch|
+      options["worktree"] = branch
+    end
+
+    op.on("--worktrees-dir DIR", "Where worktrees live (default: #{Project::DEFAULT_WORKTREES_DIR}, relative to the project dir)") do |dir|
+      options["worktrees_dir"] = dir
+    end
+
+    op.on("--from-ref REF", "When creating a new worktree+branch, the branch/ref to branch from") do |ref|
+      options["from_ref"] = ref
     end
 
     op.on("--[no-]start", "Overrides project start option for pre-filled commands") do |start|
@@ -198,6 +262,59 @@ def find_existing_sessions(proj)
   end
 end
 
+def git(dir, *args)
+  cmd = ["git", "-C", dir, *args]
+  puts "$ #{cmd.join(' ')}" if debug?
+  stdout, stderr, status = Open3.capture3(*cmd)
+  [stdout.strip, stderr.strip, status.success?]
+end
+
+def local_ref_exists?(dir, ref)
+  git(dir, "rev-parse", "--verify", "--quiet", ref).last
+end
+
+def remote_branch_exists?(dir, branch)
+  git(dir, "for-each-ref", "--format=%(refname)", "refs/remotes/*/#{branch}").first.split("\n").any?
+end
+
+# Primary branch for the repo: what origin points its HEAD at, else the first
+# conventional name that exists locally, else whatever the checkout is on.
+def main_branch(dir)
+  head, _stderr, success = git(dir, "symbolic-ref", "--short", "refs/remotes/origin/HEAD")
+  return head.split("/", 2).last if success && !head.empty?
+
+  conventional = %w[main master trunk].find { |name| local_ref_exists?(dir, "refs/heads/#{name}") }
+  return conventional if conventional
+
+  current, _stderr, success = git(dir, "rev-parse", "--abbrev-ref", "HEAD")
+  success && !current.empty? ? current : "HEAD"
+end
+
+# Ensure the worktree for the requested branch exists, creating the branch too
+# when it is not already known locally or on a remote.
+def ensure_worktree(proj)
+  return unless proj.worktree?
+  return if Dir.exist?(proj.worktree_dir)
+
+  branch, root = proj.worktree, proj.project_dir
+  fatal_error "Not a git repository: #{root}" unless local_ref_exists?(root, "HEAD")
+
+  known = local_ref_exists?(root, "refs/heads/#{branch}") || remote_branch_exists?(root, branch)
+
+  FileUtils.mkdir_p(File.dirname(proj.worktree_dir))
+
+  args = if known
+    ["worktree", "add", proj.worktree_dir, branch]
+  else
+    from_ref = proj.from_ref.to_s
+    from_ref = main_branch(root) if from_ref.empty?
+    ["worktree", "add", "-b", branch, proj.worktree_dir, from_ref]
+  end
+  _stdout, stderr, success = git(root, *args)
+  fatal_error "Could not start worktree for #{branch}:\n#{stderr}" unless success
+  puts "Started worktree for #{branch} at #{proj.worktree_dir}"
+end
+
 def example_usage
   puts <<~HELPTEXT
     Examples:
@@ -206,6 +323,8 @@ def example_usage
       $ tproj abbr path/to/project
       $ tproj --distrobox=arch-asdf --windows=5 my-project
       $ tproj --abbr=acab --dir=projects/police-brutality --windows=2
+      $ tproj dotbox --worktree=feature/thing
+      $ tproj dotbox -b bugfix --worktrees-dir=~/worktrees/dotbox
 
     Pre-configured projects: #{projects.map(&:abbr).join(', ')}
   HELPTEXT
@@ -222,7 +341,7 @@ def find_or_create_project(options)
   end
 
   # if we have any of these options besides just abbr
-  if %w[dir distrobox windows].any? { |key| options[key] }
+  if %w[dir distrobox windows worktree].any? { |key| options[key] }
     Project.new(options)
   end
 end
@@ -248,26 +367,28 @@ current = find_or_create_project(options)
 example_usage unless current
 current.apply(options)
 
-set_terminal_title("tmux: #{current.names.first}")
+set_terminal_title("tmux: #{[current.names.first, current.worktree].compact.join('/')}")
 
-if find_existing_sessions(current).member?(current.abbr)
-  cmd = current.tmux_cmd("attach -t #{current.abbr}")
+if find_existing_sessions(current).member?(current.session)
+  cmd = current.tmux_cmd("attach -t #{current.session}")
   puts "> #{cmd}" if debug?
   exec cmd
   # ^ replaces process, so execution stops there
 end
 
+ensure_worktree(current)
+
 # start building up a new tmux session
-run current.tmux_cmd("new -s #{current.abbr} -c #{current.dir} -d")
+run current.tmux_cmd("new -s #{current.session} -c #{current.dir} -d")
 delayed = []
 1.step(to: current.windows) do |n|
   cmd, label = current.commands[n - 1], current.labels[n - 1]
-  run current.tmux_cmd("new-window -t #{current.abbr} -c #{current.dir}") unless n == 1
+  run current.tmux_cmd("new-window -t #{current.session} -c #{current.dir}") unless n == 1
   if cmd
     tmux_cmd_parts = [
       "send-keys",
       "-t",
-      "#{current.abbr}:#{n}",
+      "#{current.session}:#{n}",
       keys_escape(cmd),
     ]
     tmux_cmd_parts << "Enter" if cmd && current.start
@@ -276,7 +397,7 @@ delayed = []
     delayed << full_tmux_cmd
   end
   if label
-    run current.tmux_cmd("rename-window -t #{current.abbr}:#{n}", label)
+    run current.tmux_cmd("rename-window -t #{current.session}:#{n}", label)
   end
 end
 
@@ -286,10 +407,10 @@ if delayed.any?
 end
 
 # move back to first window in case we aren't there anymore
-run current.tmux_cmd("select-window -t #{current.abbr}:1")
+run current.tmux_cmd("select-window -t #{current.session}:1")
 # finally, attach to the new session
 if current.attach?
-  cmd = current.tmux_cmd("attach -t #{current.abbr}")
+  cmd = current.tmux_cmd("attach -t #{current.session}")
   puts "> #{cmd}" if debug?
   exec cmd
 end
