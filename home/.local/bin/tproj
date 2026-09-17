@@ -21,7 +21,7 @@ class Project
   OVERWRITEABLE = %w[
     dir
     windows start distrobox detach
-    worktree worktrees_dir from_ref
+    worktree worktrees from_ref
   ]
   DEFAULT_WORKTREES_DIR = "tmp/wt"
   attr_reader :key, :options
@@ -56,7 +56,7 @@ class Project
 
   # relative paths are resolved against the project directory
   def worktrees_dir
-    configured = options["worktrees_dir"] || DEFAULT_WORKTREES_DIR
+    configured = options["worktrees"] || DEFAULT_WORKTREES_DIR
     File.expand_path(configured, project_dir)
   end
 
@@ -160,7 +160,7 @@ def parse_options(argv)
     end
 
     op.on("--worktrees-dir DIR", "Where worktrees live (default: #{Project::DEFAULT_WORKTREES_DIR}, relative to the project dir)") do |dir|
-      options["worktrees_dir"] = dir
+      options["worktrees"] = dir
     end
 
     op.on("--from-ref REF", "When creating a new worktree+branch, the branch/ref to branch from") do |ref|
@@ -367,7 +367,7 @@ current = find_or_create_project(options)
 example_usage unless current
 current.apply(options)
 
-set_terminal_title("tmux: #{[current.names.first, current.worktree].compact.join('/')}")
+set_terminal_title("tmux: #{current.session}")
 
 if find_existing_sessions(current).member?(current.session)
   cmd = current.tmux_cmd("attach -t #{current.session}")
