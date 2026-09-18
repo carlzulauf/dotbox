@@ -118,7 +118,10 @@ in
       nixos-hardware.nixosModules.common-pc-ssd
       nixos-hardware.nixosModules.common-cpu-amd
       nixos-hardware.nixosModules.common-cpu-amd-pstate
-      nixos-hardware.nixosModules.common-cpu-amd-zenpower
+      # DISABLED 9/18/2026 - zenpower5 0.5.0 misreads Strix Halo CCD registers
+      # and reports a phantom Tccd8 at 153.375C, which btop shows on every core.
+      # In-tree k10temp supports this CPU (1022:12bb) correctly.
+      # nixos-hardware.nixosModules.common-cpu-amd-zenpower
       nixos-hardware.nixosModules.common-gpu-amd
       nixos-hardware.nixosModules.framework-desktop-amd-ai-max-300-series
       ../includes/ai.nix
