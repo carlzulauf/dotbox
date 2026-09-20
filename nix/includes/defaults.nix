@@ -88,7 +88,7 @@ in
       git git-absorb lazygit tig gh
       tmux fish
       eza file fzf starship tldr
-      wget curl dig sshfs
+      wget curl dig sshfs yt-dlp
       nethogs nmap whois ethtool iw
       dysk ncdu yazi inotify-tools psmisc
       btop htop fastfetch
