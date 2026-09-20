@@ -5,6 +5,13 @@
 # Find gems in a gem tree whose compiled extensions can no longer be loaded, and
 # rebuild just those against the Ruby that is running right now.
 #
+#     rebuild-broken-gems             # check $NIX_GEM_HOME/$GEM_HOME, rebuild what's broken
+#     rebuild-broken-gems -n          # list what would be rebuilt, then stop
+#     rebuild-broken-gems -v          # name every unresolved library, not just the gem
+#     rebuild-broken-gems --gem-home vendor/bundle/ruby/4.0.0
+#
+# More info: rebuild-broken-gems -h
+#
 # Two things break a gem's .so under Nix, and neither one is visible to Bundler:
 #
 # 1. The libruby SONAME moved. Since 3.4, nixpkgs builds Ruby with the full
@@ -76,7 +83,11 @@ class Script < Struct.new(:options)
       end
     end.parse(argv)
 
-    self.new options
+    options
+  end
+
+  def self.call(argv)
+    self.new(parse_options(argv)).()
   end
 
   def call
@@ -280,4 +291,4 @@ class Script < Struct.new(:options)
   end
 end
 
-Script.parse_options(ARGV).()
+Script.(ARGV)
