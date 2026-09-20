@@ -1,8 +1,17 @@
 #!/usr/bin/env ruby
 
-require 'optparse'
+# sshls
+# -----
+# List the hosts configured in your ssh config, following any Include lines out
+# to the files they pull in.
+#
+#     sshls                     # every Host, per config file
+#     sshls -v                  # dump the configs themselves instead
+#     sshls -d ~/work/ssh       # look in a different config dir
+#
+# More info: sshls -h
 
-# list any configured ssh hosts
+require "optparse"
 
 SSH_DIR = File.expand_path("~/.ssh")
 
@@ -13,7 +22,7 @@ class Script < Struct.new(:options)
       dir: SSH_DIR,
     }
 
-    args = OptionParser.new do |op|
+    OptionParser.new do |op|
       op.banner = "Usage: sshls [options]"
 
       op.on("-d DIR", "--dir DIR", "SSH config directory to look in") do |dir|
@@ -30,7 +39,11 @@ class Script < Struct.new(:options)
       end
     end.parse(argv)
 
-    self.new options
+    options
+  end
+
+  def self.call(argv)
+    self.new(parse_options(argv)).()
   end
 
   def call
@@ -69,4 +82,4 @@ class Script < Struct.new(:options)
   end
 end
 
-Script.parse_options(ARGV).()
+Script.(ARGV)
