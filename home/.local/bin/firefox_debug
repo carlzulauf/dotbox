@@ -94,14 +94,16 @@ class Script < Struct.new(:options, :extra_args)
   def call
     abort "Could not find '#{options[:exe]}' on your PATH." unless which(options[:exe])
 
-    seed_profile
-
     puts "Starting #{options[:exe]} with remote debugging (WebDriver BiDi) on ws://127.0.0.1:#{options[:port]}"
     puts "Profile: #{options[:dir]}", nil
     puts "$ #{cmd.join(' ')}"
 
+    return puts(nil, "Dry run; nothing started.") if options[:dry_run]
+
+    seed_profile
+
     $stdout.flush
-    exec(*cmd) unless options[:dry_run]
+    exec(*cmd)
   end
 
   def cmd

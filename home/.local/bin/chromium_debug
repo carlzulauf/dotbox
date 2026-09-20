@@ -75,14 +75,16 @@ class Script < Struct.new(:options, :extra_args)
   def call
     abort "Could not find '#{options[:exe]}' on your PATH." unless which(options[:exe])
 
-    FileUtils.mkpath(options[:dir])
-
     puts "Starting #{options[:exe]} with remote debugging on http://127.0.0.1:#{options[:port]}"
     puts "Profile: #{options[:dir]}", nil
     puts "$ #{cmd.join(' ')}"
 
+    return puts(nil, "Dry run; nothing started.") if options[:dry_run]
+
+    FileUtils.mkpath(options[:dir])
+
     $stdout.flush
-    exec(*cmd) unless options[:dry_run]
+    exec(*cmd)
   end
 
   def cmd
