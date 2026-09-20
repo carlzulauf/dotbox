@@ -1,0 +1,245 @@
+#!/usr/bin/env ruby
+
+# rebuild-native-gems
+# -------------------
+# Find gems in a gem tree whose compiled extensions can no longer be loaded, and
+# rebuild just those against the Ruby that is running right now.
+#
+# Two things break a gem's .so under Nix, and neither one is visible to Bundler:
+#
+# 1. The libruby SONAME moved. Since 3.4, nixpkgs builds Ruby with the full
+#    version in the library name -- libruby-4.0.7.so.4.0, where 3.3 and earlier
+#    had a plain libruby.so.3.3 that held still across teeny releases. So every
+#    4.0.6 -> 4.0.7 style bump invalidates every extension in the tree at once.
+#    RubyGems cannot notice, because it files extensions under the ABI version
+#    (extensions/x86_64-linux/4.0.0), which is identical for all of 4.0.x.
+#    Whether the old store path survived is beside the point here: if it has,
+#    the extension loads a second libruby next to ours, which is worse than the
+#    missing-file error. So a libruby that is not *this* one counts as broken.
+#
+# 2. A store path in the RUNPATH was garbage collected. Extensions record the
+#    exact /nix/store paths they were built against -- glibc, gcc, libyaml,
+#    libpq, whatever the gem links. `cleanup-nixos` (or any nix-collect-garbage)
+#    deletes those once no generation references them, and the .so is then
+#    unloadable even though Ruby itself never changed. This is why gems rot
+#    after a big nixpkgs update that had nothing to do with Ruby.
+#
+# Libraries the Ruby process has already mapped -- libc, libm, libz and friends
+# -- are matched by SONAME and never go through the RUNPATH, so they survive
+# both cases. That is the whole reason breakage looks arbitrary: whether a gem
+# still works depends on whether something else already loaded its dependency.
+#
+# In both cases `bundle check` reports the bundle satisfied, because the gems
+# really are installed. The failure only surfaces at require time, as
+# "cannot open shared object file" out of whichever gem got there first.
+#
+# Rebuilding beats `rm -rf` on the tree: it reuses the .gem files already in
+# cache/, so it needs no network, and it leaves gems whose extensions still
+# resolve completely untouched.
+#
+# Run it in the environment whose gems you are fixing -- it judges every .so
+# against the running Ruby, so pointing it at a container's tree from the host
+# (or vice versa) reports the whole tree as broken.
+
+require 'optparse'
+require 'rbconfig'
+require 'shellwords'
+
+SYSTEM_LIB_DIRS = %w[/run/current-system/sw/lib /usr/lib /usr/lib64 /lib /lib64].freeze
+
+options = { dry_run: false, verbose: false, gem_home: nil }
+
+OptionParser.new do |op|
+  op.banner = "Usage: rebuild-native-gems [options]"
+
+  op.on("-n", "--dry-run", "List what would be rebuilt, then stop") do
+    options[:dry_run] = true
+  end
+
+  op.on("-v", "--verbose", "Show every unresolved library, not just the gem") do
+    options[:verbose] = true
+  end
+
+  op.on("--gem-home PATH", "Tree to check (default: $NIX_GEM_HOME, else $GEM_HOME)") do |path|
+    options[:gem_home] = File.expand_path(path)
+  end
+
+  op.on("-h", "--help") do
+    puts op
+    exit
+  end
+end.parse!
+
+gem_home = options[:gem_home] || ENV["NIX_GEM_HOME"] || ENV["GEM_HOME"]
+
+if gem_home.nil?
+  abort "No gem tree to check: set $NIX_GEM_HOME or $GEM_HOME, or pass --gem-home."
+end
+
+gem_home = File.expand_path(gem_home)
+abort "Not a directory: #{gem_home}" unless Dir.exist?(gem_home)
+
+# --- what the dynamic loader will already have in hand -----------------------
+
+def dynamic_info(path)
+  out = `objdump -p #{path.shellescape} 2>/dev/null`
+  return nil unless $?.success?
+
+  { needed: out.scan(/NEEDED\s+(\S+)/).flatten,
+    runpath: out[/R(?:UN)?PATH\s+(\S+)/, 1].to_s.split(":").reject(&:empty?),
+    soname: out[/SONAME\s+(\S+)/, 1] }
+end
+
+def find_lib(name, dirs)
+  dirs.each do |dir|
+    candidate = File.join(dir, name)
+    return candidate if File.exist?(candidate)
+  end
+  nil
+end
+
+# Everything reachable from the ruby binary is mapped before any gem extension
+# loads, so those SONAMEs resolve no matter what a gem's own RUNPATH says.
+def preloaded_sonames
+  seen = {}
+  queue = [RbConfig.ruby]
+
+  until queue.empty?
+    info = dynamic_info(queue.shift)
+    next if info.nil?
+
+    seen[info[:soname]] = true if info[:soname]
+    info[:needed].each do |lib|
+      next if seen.key?(lib)
+
+      seen[lib] = true
+      found = find_lib(lib, info[:runpath] + SYSTEM_LIB_DIRS)
+      queue << found if found
+    end
+  end
+
+  seen
+end
+
+preloaded = preloaded_sonames
+
+# The libruby this process is actually running on. An extension asking for any
+# other one is broken even when that file still exists: a surviving store path
+# for the previous Ruby resolves happily and maps a second libruby alongside
+# ours. Checking the name rather than the file catches that.
+RUNNING_LIBRUBY = (dynamic_info(RbConfig.ruby) || {})[:needed].to_a.find { |l| l.start_with?("libruby") }
+
+def wrong_ruby?(lib)
+  RUNNING_LIBRUBY && lib.start_with?("libruby") && lib != RUNNING_LIBRUBY
+end
+
+def unresolved_libs(so, preloaded)
+  info = dynamic_info(so)
+  return [] if info.nil?
+
+  info[:needed].select do |lib|
+    next true if wrong_ruby?(lib)
+
+    !preloaded.key?(lib) && find_lib(lib, info[:runpath] + SYSTEM_LIB_DIRS).nil?
+  end
+end
+
+# --- find the extensions that can no longer resolve --------------------------
+
+# Scope RubyGems to this tree. Without it Gem::Specification also walks the
+# read-only store gems, and `gem pristine` dies trying to rewrite one of them.
+scoped_env = { "GEM_HOME" => gem_home, "GEM_PATH" => gem_home, "RUBYOPT" => "-W0" }
+
+Gem.paths = { "GEM_HOME" => gem_home, "GEM_PATH" => gem_home }
+Gem::Specification.reset
+
+specs = Gem::Specification.select do |spec|
+  spec.base_dir == gem_home && Dir.exist?(spec.gem_dir)
+end
+
+broken = []
+
+specs.each do |spec|
+  unresolved = Hash.new { |h, k| h[k] = [] }
+
+  Dir.glob(File.join(spec.gem_dir, "**", "*.so")).each do |so|
+    unresolved_libs(so, preloaded).each { |lib| unresolved[lib] << so }
+  end
+
+  broken << [spec, unresolved] unless unresolved.empty?
+end
+
+if broken.empty?
+  puts "All compiled extensions in #{gem_home} resolve against ruby #{RUBY_VERSION}."
+  exit
+end
+
+puts "ruby #{RUBY_VERSION} (#{RbConfig.ruby})"
+puts "#{broken.size} gem#{'s' if broken.size != 1} in #{gem_home} cannot load:"
+broken.each do |spec, unresolved|
+  puts "  #{spec.full_name}  ->  #{unresolved.keys.sort.join(' ')}"
+  next unless options[:verbose]
+
+  unresolved.each do |lib, sos|
+    sos.each { |so| puts "      #{lib}  #{so.sub("#{spec.gem_dir}/", '')}" }
+  end
+end
+
+if options[:dry_run]
+  puts
+  puts "Dry run; nothing rebuilt."
+  exit
+end
+
+# --- rebuild -----------------------------------------------------------------
+
+# `gem pristine` is the right tool, but it regenerates binstubs into a bindir it
+# picks itself, which for some gems is the read-only store. Reinstalling from
+# the cached .gem does the same extension build with a bindir we choose.
+def pristine(spec, env)
+  system(env, "gem", "pristine", spec.name,
+         "--version", spec.version.to_s, "--extensions",
+         out: File::NULL, err: File::NULL)
+end
+
+def reinstall(spec, env, gem_home)
+  cached = File.join(gem_home, "cache", "#{spec.full_name}.gem")
+  source = File.exist?(cached) ? [cached, "--local"] : [spec.name, "--version", spec.version.to_s]
+
+  system(env, "gem", "install", *source, "--force", "--no-document",
+         "--bindir", File.join(gem_home, "bin"),
+         out: File::NULL, err: File::NULL)
+end
+
+def still_broken?(spec, preloaded)
+  Dir.glob(File.join(spec.gem_dir, "**", "*.so")).any? do |so|
+    unresolved_libs(so, preloaded).any?
+  end
+end
+
+puts
+failed = []
+
+broken.each do |spec, _|
+  print "rebuilding #{spec.full_name}... "
+
+  pristine(spec, scoped_env) || reinstall(spec, scoped_env, gem_home)
+
+  if still_broken?(spec, preloaded)
+    puts "still unresolved"
+    failed << spec
+  else
+    puts "ok"
+  end
+end
+
+puts
+puts "Rebuilt #{broken.size - failed.size} of #{broken.size}."
+
+unless failed.empty?
+  puts
+  puts "Still broken -- these link libraries that are not in this environment at all."
+  puts "Build them where those libraries exist (a devshell, or the container that owns the tree):"
+  failed.each { |spec| puts "  #{spec.full_name}" }
+  exit 1
+end
