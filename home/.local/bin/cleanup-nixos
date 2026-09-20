@@ -4,6 +4,14 @@
 # -------------
 # Trim old Nix profile generations, then collect the garbage that frees up.
 #
+#     cleanup-nixos               # keep what configurationLimit says to keep
+#     cleanup-nixos +5            # keep the newest 5 generations
+#     cleanup-nixos 30d           # drop generations older than 30 days
+#     cleanup-nixos -n old        # show what "keep only the active one" would run
+#     cleanup-nixos --boot-sync   # reinstall the boot loader after trimming
+#
+# More info: cleanup-nixos -h
+#
 # The generation spec is passed straight through to `nix-env --delete-generations`:
 #
 #   +5    keep the newest 5 generations
@@ -29,7 +37,7 @@
 # with. A bare run straight after a rebuild trims exactly the generations whose
 # entries that rebuild already dropped, so it has nothing to reconcile.
 
-require 'optparse'
+require "optparse"
 
 SYSTEM_PROFILE = "/nix/var/nix/profiles/system"
 ROOT_PROFILE   = "/nix/var/nix/profiles/per-user/root/profile"
@@ -58,7 +66,11 @@ class Script < Struct.new(:options, :spec)
       end
     end.parse!(argv)
 
-    self.new options, argv.first
+    [options, argv.first]
+  end
+
+  def self.call(argv)
+    self.new(*parse_options(argv)).()
   end
 
   def call
@@ -141,4 +153,4 @@ class Script < Struct.new(:options, :spec)
   end
 end
 
-Script.parse_options(ARGV).()
+Script.(ARGV)
