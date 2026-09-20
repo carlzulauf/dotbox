@@ -5,6 +5,10 @@
 # Populate the gitignored local config a worktree needs, from the known-good
 # copies in the repo's MAIN worktree.
 #
+#     git wt-sync           # sync this worktree from the manifest
+#     git wt-sync -n -v     # show what would happen, and what would be skipped
+#     git wt-sync -f        # replace files that already exist here
+#
 # More info: git wt-sync -h
 #
 # Reads a manifest from $GIT_COMMON_DIR/wt-sync.conf, so it lives in the shared
@@ -18,6 +22,44 @@ require "optparse"
 class WorktreeSync
   Entry = Struct.new(:mode, :pattern)
 
+  def self.parse(args)
+    options = {}
+
+    parser = OptionParser.new do |o|
+      o.banner = <<~BANNER
+        Usage: git wt-sync [options]
+
+        Copies or symlinks the gitignored local config listed in
+        $GIT_COMMON_DIR/wt-sync.conf from the main worktree into this one.
+
+        Manifest format -- one path per line, `#` comments, globs allowed:
+
+          link config/master.key        # shared: edit once, every worktree sees it
+          link config/credentials/*.key
+          copy .env.local.overrides     # per-worktree: give this branch its own DB/port
+          .env.local.overrides          # bare path means copy
+
+        Options:
+      BANNER
+
+      o.on("-n", "--dry-run", "Show what would be synced, change nothing") { options[:dry_run] = true }
+      o.on("-f", "--force", "Replace files that already exist in this worktree") { options[:force] = true }
+      o.on("-v", "--verbose", "Also report what was skipped and why") { options[:verbose] = true }
+
+      o.on("-h", "--help", "The thing you probably just ran") do
+        puts o
+        exit
+      end
+    end
+
+    parser.parse!(args)
+    options
+  end
+
+  def self.call(argv)
+    new(**parse(argv)).()
+  end
+
   attr_reader :dry_run, :force, :verbose
 
   def initialize(dry_run: false, force: false, verbose: false)
@@ -26,7 +68,7 @@ class WorktreeSync
     @verbose = verbose
   end
 
-  def perform
+  def call
     return say("Not inside a work tree; nothing to do.") unless worktree
     if worktree == main_worktree
       return say("#{worktree} is the main worktree; nothing to sync.")
@@ -130,35 +172,6 @@ class WorktreeSync
     puts message if verbose
     nil
   end
-
-  def self.parse(args)
-    options = {}
-    parser = OptionParser.new do |o|
-      o.banner = <<~BANNER
-        Usage: git wt-sync [options]
-
-        Copies or symlinks the gitignored local config listed in
-        $GIT_COMMON_DIR/wt-sync.conf from the main worktree into this one.
-
-        Manifest format -- one path per line, `#` comments, globs allowed:
-
-          link config/master.key        # shared: edit once, every worktree sees it
-          link config/credentials/*.key
-          copy .env.local.overrides     # per-worktree: give this branch its own DB/port
-          .env.local.overrides          # bare path means copy
-
-        Options:
-      BANNER
-
-      o.on("-n", "--dry-run", "Show what would be synced, change nothing") { options[:dry_run] = true }
-      o.on("-f", "--force", "Replace files that already exist in this worktree") { options[:force] = true }
-      o.on("-v", "--verbose", "Also report what was skipped and why") { options[:verbose] = true }
-      o.on("-h", "--help", "The thing you probably just ran") { puts o; exit }
-    end
-
-    parser.parse!(args)
-    new(**options)
-  end
 end
 
-WorktreeSync.parse(ARGV).perform
+WorktreeSync.(ARGV)
