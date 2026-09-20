@@ -37,82 +37,108 @@ USER_PROFILE   = File.expand_path("~/.nix-profile")
 
 FALLBACK_GENERATIONS = "+5"
 
-# Best effort: configurationLimit is baked into the generated boot loader
-# builder as `CONFIGURATION_LIMIT = int("N")`, where 0 means unlimited. It is
-# not exposed anywhere more stable, so treat any surprise as "use the fallback".
-def configured_generations
-  wrapper   = File.read(File.join(SYSTEM_PROFILE, "bin/switch-to-configuration"))
-  installer = wrapper[/INSTALL_BOOTLOADER='([^']+)'/, 1] or return nil
-  builder   = File.read(installer)[%r{/nix/store/\S+/bin/systemd-boot}] or return nil
-  limit     = File.read(builder)[/^CONFIGURATION_LIMIT = int\("(\d+)"\)/, 1].to_i
+class Script < Struct.new(:options, :spec)
+  def self.parse_options(argv)
+    options = { dry_run: false, boot_sync: false }
 
-  limit.positive? ? "+#{limit}" : nil
-rescue SystemCallError
-  nil
-end
+    OptionParser.new do |op|
+      op.banner = "Usage: cleanup-nixos [options] [generation-spec]"
 
-options = { dry_run: false, boot_sync: false }
+      op.on("-n", "--dry-run", "Print the commands without running them") do
+        options[:dry_run] = true
+      end
 
-OptionParser.new do |op|
-  op.banner = "Usage: cleanup-nixos [options] [generation-spec]"
+      op.on("--boot-sync", "Reinstall the boot loader after trimming, dropping stale entries") do
+        options[:boot_sync] = true
+      end
 
-  op.on("-n", "--dry-run", "Print the commands without running them") do
-    options[:dry_run] = true
+      op.on("-h", "--help") do
+        puts op
+        exit
+      end
+    end.parse!(argv)
+
+    self.new options, argv.first
   end
 
-  op.on("--boot-sync", "Reinstall the boot loader after trimming, dropping stale entries") do
-    options[:boot_sync] = true
+  def call
+    resolve_kept_generations
+    run_cleanup_commands
   end
 
-  op.on("-h", "--help") do
-    puts op
-    exit
+  # --- which generations to keep ---------------------------------------------
+
+  attr_reader :generations
+
+  def resolve_kept_generations
+    return @generations = spec if spec
+
+    if (limit = configured_generations)
+      @generations = limit
+      puts "Keeping #{limit[1..]} generations, per configurationLimit."
+    else
+      # The fallback can be tighter than the real limit (frix keeps 10), which would
+      # strand entries. Not knowing the limit is precisely when we must reconcile.
+      @generations = FALLBACK_GENERATIONS
+      options[:boot_sync] = true
+      puts "Could not read configurationLimit; falling back to #{@generations} with --boot-sync."
+    end
   end
-end.parse!
 
-gens = ARGV.first
-if gens.nil?
-  gens = configured_generations
-  if gens
-    puts "Keeping #{gens[1..]} generations, per configurationLimit."
-  else
-    # The fallback can be tighter than the real limit (frix keeps 10), which would
-    # strand entries. Not knowing the limit is precisely when we must reconcile.
-    gens = FALLBACK_GENERATIONS
-    options[:boot_sync] = true
-    puts "Could not read configurationLimit; falling back to #{gens} with --boot-sync."
+  # Best effort: configurationLimit is baked into the generated boot loader
+  # builder as `CONFIGURATION_LIMIT = int("N")`, where 0 means unlimited. It is
+  # not exposed anywhere more stable, so treat any surprise as "use the fallback".
+  def configured_generations
+    wrapper   = File.read(File.join(SYSTEM_PROFILE, "bin/switch-to-configuration"))
+    installer = wrapper[/INSTALL_BOOTLOADER='([^']+)'/, 1] or return nil
+    builder   = File.read(installer)[%r{/nix/store/\S+/bin/systemd-boot}] or return nil
+    limit     = File.read(builder)[/^CONFIGURATION_LIMIT = int\("(\d+)"\)/, 1].to_i
+
+    limit.positive? ? "+#{limit}" : nil
+  rescue SystemCallError
+    nil
+  end
+
+  # --- the commands ----------------------------------------------------------
+
+  def commands
+    [].tap do |cmds|
+      # The one that actually matters: NixOS system generations and their boot entries.
+      cmds << ["sudo", "nix-env", "--profile", SYSTEM_PROFILE, "--delete-generations", generations]
+
+      if options[:boot_sync]
+        cmds << ["sudo", File.join(SYSTEM_PROFILE, "bin/switch-to-configuration"), "boot"]
+      end
+
+      # Package profiles. Absent on machines that install everything declaratively.
+      cmds << ["sudo", "nix-env", "--profile", ROOT_PROFILE, "--delete-generations", generations] if File.exist?(ROOT_PROFILE)
+      cmds << ["nix-env", "--delete-generations", generations] if File.exist?(USER_PROFILE)
+
+      # Generations are gone, so a plain collect is enough -- no --delete-old needed.
+      cmds << ["nix-collect-garbage"]
+      cmds << ["sudo", "nix-collect-garbage"]
+    end
+  end
+
+  def run_cleanup_commands
+    failed = []
+
+    commands.each do |cmd|
+      puts " $ #{cmd.join(' ')}"
+      next if options[:dry_run]
+
+      failed << cmd unless system(*cmd)
+    end
+
+    report_failures(failed) unless failed.empty?
+  end
+
+  def report_failures(failed)
+    puts
+    puts "Failed:"
+    failed.each { |cmd| puts "  #{cmd.join(' ')}" }
+    exit 1
   end
 end
 
-commands = []
-
-# The one that actually matters: NixOS system generations and their boot entries.
-commands << ["sudo", "nix-env", "--profile", SYSTEM_PROFILE, "--delete-generations", gens]
-
-if options[:boot_sync]
-  commands << ["sudo", File.join(SYSTEM_PROFILE, "bin/switch-to-configuration"), "boot"]
-end
-
-# Package profiles. Absent on machines that install everything declaratively.
-commands << ["sudo", "nix-env", "--profile", ROOT_PROFILE, "--delete-generations", gens] if File.exist?(ROOT_PROFILE)
-commands << ["nix-env", "--delete-generations", gens] if File.exist?(USER_PROFILE)
-
-# Generations are gone, so a plain collect is enough -- no --delete-old needed.
-commands << ["nix-collect-garbage"]
-commands << ["sudo", "nix-collect-garbage"]
-
-failed = []
-
-commands.each do |cmd|
-  puts " $ #{cmd.join(' ')}"
-  next if options[:dry_run]
-
-  failed << cmd unless system(*cmd)
-end
-
-unless failed.empty?
-  puts
-  puts "Failed:"
-  failed.each { |cmd| puts "  #{cmd.join(' ')}" }
-  exit 1
-end
+Script.parse_options(ARGV).()
