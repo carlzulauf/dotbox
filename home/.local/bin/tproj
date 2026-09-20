@@ -417,7 +417,7 @@ class Script < Struct.new(:options)
     options["abbr"] = args.shift if args.any? && !options["abbr"]
     options["dir"] = args.shift if args.any? && !options["dir"]
 
-    self.new options
+    options
   end
 
   def self.example_usage
@@ -434,6 +434,10 @@ class Script < Struct.new(:options)
       Pre-configured projects: #{ProjectRegistry.default.abbrs.join(', ')}
     HELPTEXT
     exit
+  end
+
+  def self.call(argv)
+    self.new(parse_options(argv)).()
   end
 
   def call
@@ -462,4 +466,4 @@ class Script < Struct.new(:options)
   end
 end
 
-Script.parse_options(ARGV).()
+Script.(ARGV)
