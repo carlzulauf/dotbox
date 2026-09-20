@@ -135,6 +135,17 @@ Pretty-print JSON
 
 Takes json, supplied via STDIN or from file names passed to the script, parses it, and spits it back out nicely formatted.
 
+### `rebuild-broken-gems`
+
+Repairs ruby gems with broken native extensions, usually due to the shared objects it was compiled against no longer being in the nix store.
+
+This script detects gems in this broken state and rebuilds their native extensions so they work again.
+```
+rebuild-broken-gems           # $NIX_GEM_HOME
+rebuild-broken-gems -n -v     # just show what is broken, and why
+rebuild-broken-gems --gem-home ~/.local/share/gems/portal
+```
+
 ### `prepend_command`
 
 Not sure what arguments are being sent to a command? Just prepend the command name with `prepend_command` and the full command will be printed to the console before being executed.
