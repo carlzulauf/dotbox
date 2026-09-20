@@ -9,7 +9,7 @@
 #     firefox_debug -p 9333                          # different port
 #     firefox_debug -e firefox-devedition            # different browser
 #     firefox_debug -d ~/.config/firefox-unabridged  # different profile dir
-#     firefox_debug -- https://localhost             # extra args go to the browser
+#     firefox_debug https://localhost --private      # unknown args go to the browser
 #
 # Note that firefox speaks WebDriver BiDi here, not the Chrome DevTools
 # Protocol, so the endpoint is a websocket (ws://127.0.0.1:9222) and there is no
@@ -18,7 +18,7 @@
 # WebDriverBiDiServer.json in the profile dir instead.
 #
 # If a client is rejected with an origin/host error, pass firefox's escape
-# hatches through: firefox_debug -- --remote-allow-origins=http://localhost:3000
+# hatches through: firefox_debug --remote-allow-origins=http://localhost:3000
 #
 # More info: firefox_debug -h
 
@@ -47,7 +47,9 @@ class Script < Struct.new(:options, :extra_args)
       exe: DEFAULT_EXE,
     }
 
-    OptionParser.new do |op|
+    extra_args = []
+
+    parser = OptionParser.new do |op|
       op.banner = "Usage: firefox_debug [options] [-- browser args]"
 
       op.on("-p PORT", "--port PORT", Integer, "Remote debugging port. Default is #{DEFAULT_PORT}.") do |port|
@@ -62,13 +64,31 @@ class Script < Struct.new(:options, :extra_args)
         options[:exe] = exe
       end
 
+      op.on("--dry-run", "Print firefox launch command, but don't execute") do
+        options[:dry_run] = true
+      end
+
       op.on("-h", "--help") do
         puts op
         exit
       end
-    end.parse!(argv)
+    end
 
-    self.new options, argv
+    # Anything we don't recognize (browser flags, URLs) is collected for the
+    # browser instead of being an error, so `--` is optional.
+    begin
+      parser.order!(argv) { |arg| extra_args << arg }
+    rescue OptionParser::InvalidOption => e
+      extra_args.concat(e.args)
+      retry
+    end
+
+    # `order!` stops at `--` and leaves the rest of argv alone.
+    [options, extra_args + argv]
+  end
+
+  def self.call(argv)
+    self.new(*parse_options(argv)).()
   end
 
   def call
@@ -81,7 +101,7 @@ class Script < Struct.new(:options, :extra_args)
     puts "$ #{cmd.join(' ')}"
 
     $stdout.flush
-    exec(*cmd)
+    exec(*cmd) unless options[:dry_run]
   end
 
   def cmd
@@ -111,4 +131,4 @@ class Script < Struct.new(:options, :extra_args)
   end
 end
 
-Script.parse_options(ARGV).()
+Script.(ARGV)
