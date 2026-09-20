@@ -1,0 +1,284 @@
+#!/usr/bin/env ruby
+
+# git global-status
+# -----------------
+# Walk every git repo under ~/projects and show `git status` for the ones you
+# haven't finished with: a dirty working tree, commits waiting to be pushed, or
+# an untracked branch sitting ahead of main.
+#
+#     git global-status              # every unfinished repo under ~/projects
+#     git global-status -b           # one summary line per repo
+#     git global-status -d ~/work    # look somewhere else (repeatable)
+#     git global-status --stash      # also flag clean repos holding a stash
+#
+# More info: git global-status -h
+#
+# A repo gets reported when any of these hold:
+#
+#   * `git status` would say anything other than "working tree clean" --
+#     staged, modified, conflicted or untracked files.
+#   * the branch tracks an upstream and sits ahead of it.
+#   * the branch tracks nothing, and is ahead of the same branch on origin, or
+#     of main/master.
+#   * the branch tracks nothing, the repo has remotes, and nothing above gave a
+#     baseline to compare against -- i.e. the branch was never pushed anywhere.
+#
+# Repos with no remote at all are only reported for a dirty tree: there is
+# nowhere to push, so there is nothing left to wrap up. Detached heads are
+# judged on their working tree alone, for the same reason.
+#
+# Nothing here writes, fetches, or touches the network -- ahead counts are
+# measured against the remote-tracking refs as of the last fetch.
+
+require "optparse"
+
+DEFAULT_ROOT  = File.expand_path("~/projects")
+DEFAULT_DEPTH = 3
+TRUNKS        = %w[main master].freeze
+PRUNE         = %w[node_modules vendor].freeze
+
+module Paint
+  COLORS = { bold: 1, dim: 2, green: 32, yellow: 33, cyan: 36 }.freeze
+
+  class << self
+    attr_accessor :on
+  end
+
+  def self.[](text, *styles)
+    return text unless on
+
+    "\e[#{styles.map { |style| COLORS.fetch(style) }.join(";")}m#{text}\e[0m"
+  end
+end
+
+# One repo, judged by a handful of read-only git commands.
+class RepoStatus
+  attr_reader :path, :options
+
+  def initialize(path, options)
+    @path    = path
+    @options = options
+  end
+
+  def unfinished? = reasons.any?
+
+  def reasons
+    @reasons ||= [dirty_reason, unpushed_reason, stash_reason].compact
+  end
+
+  def headline
+    [
+      Paint[display_path, :bold, :cyan],
+      Paint["[#{detached? ? "detached HEAD" : branch}]", :dim],
+      Paint[reasons.join(", "), :yellow],
+    ].join(" ")
+  end
+
+  # `git status` as you would see it standing in the repo yourself.
+  def status_report
+    color = Paint.on ? "always" : "never"
+    git("-c", "color.status=#{color}", "status", *status_flags).to_s.rstrip
+  end
+
+  def display_path
+    home = File.expand_path("~")
+    path.start_with?("#{home}/") ? path.sub(home, "~") : path
+  end
+
+  private
+
+  def dirty_reason
+    return nil if changes.empty?
+
+    untracked = changes.count { |line| line.start_with?("??") }
+    counts = []
+    counts << "#{changes.size - untracked} changed" unless changes.size == untracked
+    counts << "#{untracked} untracked" if untracked.positive?
+
+    "📝 #{counts.join(", ")}"
+  end
+
+  def unpushed_reason
+    return nil if detached? || !commits?
+
+    if upstream
+      count = commit_count("#{upstream}..HEAD")
+      "⬆️ #{count} to push to #{upstream}" if count.positive?
+    elsif baseline
+      count = commit_count("#{baseline}..HEAD")
+      "⬆️ #{count} ahead of #{baseline}, no upstream" if count.positive?
+    elsif remotes?
+      "⬆️ never pushed, no upstream"
+    end
+  end
+
+  def stash_reason
+    return nil unless options[:stash]
+
+    count = commit_count("--walk-reflogs", "refs/stash")
+    "📦 #{count} stashed" if count.positive?
+  end
+
+  # What an upstream-less branch gets measured against: the same branch on
+  # origin first, then the repo's trunk -- unless this branch is the trunk,
+  # which has nothing local left to fall back on.
+  def baseline
+    return @baseline if defined?(@baseline)
+
+    candidates = ["origin/#{branch}"]
+    candidates += TRUNKS + TRUNKS.map { |trunk| "origin/#{trunk}" } unless TRUNKS.include?(branch)
+
+    @baseline = candidates.find { |ref| ref?(ref) }
+  end
+
+  # One `git status --porcelain` line per changed file, untracked ones as "??".
+  def changes
+    @changes ||= git("status", "--porcelain", *status_flags).to_s.lines(chomp: true)
+  end
+
+  # Empty on a detached head, but still the branch name before the first commit.
+  def branch
+    @branch ||= git("branch", "--show-current").to_s.strip
+  end
+
+  def detached? = branch.empty?
+
+  def upstream
+    return @upstream if defined?(@upstream)
+
+    @upstream = git("rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}")&.strip
+  end
+
+  def commits? = ref?("HEAD")
+
+  def remotes? = !git("remote").to_s.strip.empty?
+
+  def ref?(ref)
+    !git("rev-parse", "--verify", "--quiet", "#{ref}^{commit}").nil?
+  end
+
+  def commit_count(*args)
+    git("rev-list", "--count", *args).to_s.strip.to_i
+  end
+
+  def status_flags
+    options[:untracked] ? [] : ["--untracked-files=no"]
+  end
+
+  # Returns stdout, or nil when git exited non-zero.
+  def git(*args)
+    output = IO.popen(["git", "-C", path, *args], err: File::NULL, &:read)
+    $?.success? ? output : nil
+  end
+end
+
+class Script < Struct.new(:options)
+  def self.parse_options(argv)
+    options = {
+      roots:     [],
+      depth:     DEFAULT_DEPTH,
+      brief:     false,
+      stash:     false,
+      untracked: true,
+      color:     $stdout.tty?,
+    }
+
+    OptionParser.new do |op|
+      op.banner = "Usage: git global-status [options] [DIR ...]"
+
+      op.on("-d DIR", "--dir DIR", "Directory to search. Repeatable. Default: #{DEFAULT_ROOT}") do |dir|
+        options[:roots] << File.expand_path(dir)
+      end
+
+      op.on("--depth N", Integer, "How deep to look for repos. Default: #{DEFAULT_DEPTH}") do |depth|
+        options[:depth] = depth
+      end
+
+      op.on("-b", "--brief", "One summary line per repo, no `git status` body") do
+        options[:brief] = true
+      end
+
+      op.on("-s", "--stash", "Also report clean repos holding stashed changes") do
+        options[:stash] = true
+      end
+
+      op.on("--no-untracked", "Ignore untracked files when judging a tree dirty") do
+        options[:untracked] = false
+      end
+
+      op.on("--[no-]color", "Force color on or off. Default: on when stdout is a tty") do |color|
+        options[:color] = color
+      end
+
+      op.on("-h", "--help", "The thing you probably just ran") do
+        puts op
+        exit
+      end
+    end.parse!(argv)
+
+    options[:roots] += argv.map { |dir| File.expand_path(dir) }
+    options[:roots] = [DEFAULT_ROOT] if options[:roots].empty?
+    options
+  end
+
+  def self.call(argv)
+    new(parse_options(argv)).()
+  end
+
+  def call
+    Paint.on = options[:color]
+
+    repos = options[:roots].flat_map { |root| find_repos(root, options[:depth]) }.uniq
+    abort "No git repos found under #{options[:roots].join(", ")}." if repos.empty?
+
+    unfinished = repos.map { |repo| RepoStatus.new(repo, options) }.select(&:unfinished?)
+    unfinished.each { |repo| report(repo) }
+    summarize(repos, unfinished)
+  end
+
+  private
+
+  def report(repo)
+    puts repo.headline
+    return if options[:brief]
+
+    puts repo.status_report
+    puts
+  end
+
+  def summarize(repos, unfinished)
+    puts if unfinished.any? && options[:brief]
+
+    counted = "#{repos.size} #{repos.size == 1 ? "repo" : "repos"}"
+
+    if unfinished.empty?
+      puts Paint["✨ All #{counted} clean and pushed.", :green]
+    else
+      puts Paint["#{unfinished.size} of #{counted} left unfinished.", :bold]
+    end
+  end
+
+  # Repo roots, pruning inside each repo we find: a repo's own submodules and
+  # nested checkouts are that repo's business, not ours.
+  def find_repos(dir, depth)
+    return [] unless File.directory?(dir)
+    return [dir] if repo?(dir)
+    return [] if depth <= 0
+
+    Dir.children(dir).sort.flat_map do |child|
+      next [] if child.start_with?(".") || PRUNE.include?(child)
+
+      path = File.join(dir, child)
+      next [] if File.symlink?(path) || !File.directory?(path)
+
+      find_repos(path, depth - 1)
+    end
+  end
+
+  # True for a normal checkout and for a linked worktree, whose .git is a file.
+  def repo?(dir)
+    File.exist?(File.join(dir, ".git"))
+  end
+end
+
+Script.(ARGV)
