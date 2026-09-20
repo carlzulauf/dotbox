@@ -1,5 +1,19 @@
 #!/usr/bin/env ruby
 
+# redis-box
+# ---------
+# Run a redis-server out of a distrobox, one rdb file per project, from a config
+# rendered out of an ERB template. Creates the box from the docker.io/redis
+# image on first use, and writes the project's config if it doesn't have one.
+#
+#     redis-box                  # the "default" project on port 6379
+#     redis-box myapp            # myapp.conf / myapp.rdb
+#     redis-box myapp -p 6380    # different port
+#     redis-box myapp -f         # re-render the config over the existing one
+#     redis-box -x my-redis-box  # use a box you already have
+#
+# More info: redis-box -h
+
 require "optparse"
 require "erb"
 require "fileutils"
@@ -57,7 +71,11 @@ class Script < Struct.new(:options)
 
     options[:project] = args.first if args.first
 
-    self.new options
+    options
+  end
+
+  def self.call(argv)
+    self.new(parse_options(argv)).()
   end
 
   def call
@@ -97,4 +115,4 @@ class Script < Struct.new(:options)
   end
 end
 
-Script.parse_options(ARGV).()
+Script.(ARGV)
