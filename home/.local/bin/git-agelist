@@ -27,6 +27,47 @@ class AgeList
   # AGE_FMT = "%aI" # author date
   AGE_FMT = "%cI" # committer date
 
+  def self.parse(args)
+    opts = new
+
+    parser = OptionParser.new do |o|
+      o.banner = "Usage: git agelist [options] STRING [STRING ...]"
+      o.separator ""
+      o.separator "Strings may also be piped on STDIN, one per line."
+      o.separator ""
+      o.separator "Options:"
+
+      o.on("-j", "--json", "Output JSON instead of an ASCII table") { opts.format = :json }
+      o.on("-a", "--all", "Search all refs (git log --all), not just HEAD") { opts.search_all = true }
+      o.on("-G", "--regex", "Treat each string as a regex (git log -G) rather than a literal") { opts.pickaxe = "-G" }
+
+      o.on("-h", "--help", "The thing you probably just ran") do
+        puts o
+        exit
+      end
+    end
+
+    parser.parse!(args)
+
+    opts.strings = args.dup
+    # Fall back to STDIN (one string per line) only when no strings were given as
+    # arguments, so passing arguments never blocks waiting on a non-tty STDIN.
+    if opts.strings.empty? && !STDIN.tty?
+      opts.strings = STDIN.read.split("\n").map(&:strip).reject(&:empty?)
+    end
+    opts.strings.uniq!
+
+    if opts.strings.empty?
+      abort "No strings given.\n\n#{parser}"
+    end
+
+    opts
+  end
+
+  def self.call(argv)
+    parse(argv).()
+  end
+
   attr_accessor :strings, :format, :search_all, :pickaxe
 
   def initialize
@@ -36,7 +77,7 @@ class AgeList
     @pickaxe    = "-S" # literal-string pickaxe; "-G" treats strings as regexes
   end
 
-  def perform
+  def call
     ensure_repo!
     rows = strings.map { |string| build_row(string) }
     rows = rows.sort_by { |row| [row[:earliest] ? 0 : 1, row[:earliest] || DateTime.new] }
@@ -126,43 +167,6 @@ class AgeList
     _out, _err, status = Open3.capture3("git", "rev-parse", "--is-inside-work-tree")
     abort "Not inside a git repository." unless status.success?
   end
-
-  def self.parse(args)
-    opts = new
-
-    parser = OptionParser.new do |o|
-      o.banner = "Usage: git agelist [options] STRING [STRING ...]"
-      o.separator ""
-      o.separator "Strings may also be piped on STDIN, one per line."
-      o.separator ""
-      o.separator "Options:"
-
-      o.on("-j", "--json", "Output JSON instead of an ASCII table") { opts.format = :json }
-      o.on("-a", "--all", "Search all refs (git log --all), not just HEAD") { opts.search_all = true }
-      o.on("-G", "--regex", "Treat each string as a regex (git log -G) rather than a literal") { opts.pickaxe = "-G" }
-
-      o.on("-h", "--help", "The thing you probably just ran") do
-        puts o
-        exit
-      end
-    end
-
-    parser.parse!(args)
-
-    opts.strings = args.dup
-    # Fall back to STDIN (one string per line) only when no strings were given as
-    # arguments, so passing arguments never blocks waiting on a non-tty STDIN.
-    if opts.strings.empty? && !STDIN.tty?
-      opts.strings = STDIN.read.split("\n").map(&:strip).reject(&:empty?)
-    end
-    opts.strings.uniq!
-
-    if opts.strings.empty?
-      abort "No strings given.\n\n#{parser}"
-    end
-
-    opts
-  end
 end
 
-AgeList.parse(ARGV).perform
+AgeList.(ARGV)
