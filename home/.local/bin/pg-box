@@ -1,15 +1,31 @@
 #!/usr/bin/env ruby
 
+# pg-box
+# ------
+# Run a throwaway postgres out of a distrobox, with its data dir and unix socket
+# under your home instead of /var. Creates the box from the docker.io/postgres
+# image on first use, and runs initdb if the data dir isn't there yet.
+#
+#     pg-box                     # postgres on the latest image, port 5432
+#     pg-box -p 5433             # different port
+#     pg-box -v 16               # pin the image version
+#     pg-box -d ~/tmp/pg         # different data dir
+#     pg-box -x my-existing-box  # use a box you already have
+#
+# The equivalent by hand, for reference:
+#
+#     initdb --locale en_US.UTF-8 -D ~/.local/share/postgres/data
+#     postgresql-check-db-dir ~/.local/share/postgres/data
+#     postgres -D ~/.local/share/postgres/data -k ~/.local/share/postgres -p 5432
+#
+# More info: pg-box -h
+
 require "optparse"
 require "fileutils"
 require "shellwords"
 
 DEFAULT_DIR = "~/.local/share/postgres"
 DEFAULT_PORT = 5432
-
-# initdb --locale en_US.UTF-8 -D ~/.local/share/postgres/data
-# postgresql-check-db-dir ~/.local/share/postgres/data
-# postgres -D ~/.local/share/postgres/data -k ~/.local/share/postgres -p 5432
 
 class Script < Struct.new(:options)
   def self.parse_options(argv)
@@ -49,7 +65,11 @@ class Script < Struct.new(:options)
       end
     end.parse(argv)
 
-    self.new options
+    options
+  end
+
+  def self.call(argv)
+    self.new(parse_options(argv)).()
   end
 
   def call
@@ -77,7 +97,6 @@ class Script < Struct.new(:options)
 
   def init_data_dir
     FileUtils.mkpath(data_dir)
-    # initdb --locale en_US.UTF-8 -D ~/.local/share/postgres/data
     dbx_exec("initdb --locale en_US.UTF-8 -D #{esc(data_dir)}")
   end
 
@@ -99,4 +118,4 @@ class Script < Struct.new(:options)
   end
 end
 
-Script.parse_options(ARGV).()
+Script.(ARGV)
