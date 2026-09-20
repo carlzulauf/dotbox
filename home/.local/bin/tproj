@@ -15,7 +15,17 @@ require "fileutils"
 
 # looks in ~/.config/tproj.conf for project configs
 
-$debug = false
+# Command tracing, shared by everything here that shells out.
+module Trace
+  class << self
+    attr_accessor :enabled
+    alias enabled? enabled
+
+    def echo(cmd, prefix: "$")
+      puts "#{prefix} #{Array(cmd).join(' ')}" if enabled?
+    end
+  end
+end
 
 class Project
   OVERWRITEABLE = %w[
@@ -138,279 +148,318 @@ class Project
   end
 end
 
-def parse_options(argv)
-  options = {}
-  args = OptionParser.new do |op|
-    op.banner = "Usage: tproj [options] [project_name] [dir]"
+# The configured projects, read from the YAML configs and looked up by name.
+class ProjectRegistry
+  CONFIG      = "~/.config/tproj.yml"
+  HOST_CONFIG = "~/.config/tproj.%s.yml"
 
-    op.on("-a ABBR", "--abbr ABBR", "Abbreviation for project. Used as tmux session name.") do |abbr|
-      options["abbr"] = abbr
-    end
-
-    op.on("-d DIR", "--dir DIR", "Project working directory") do |dir|
-      options["dir"] = dir
-    end
-
-    op.on("-w WINDOWS", "--windows WINDOWS", Integer, "Number of tmux windows in project") do |windows|
-      options["windows"] = [windows, 1].max
-    end
-
-    op.on("-b BRANCH", "--worktree BRANCH", "Create/switch to a git worktree for BRANCH and session it there") do |branch|
-      options["worktree"] = branch
-    end
-
-    op.on("--worktrees-dir DIR", "Where worktrees live (default: #{Project::DEFAULT_WORKTREES_DIR}, relative to the project dir)") do |dir|
-      options["worktrees"] = dir
-    end
-
-    op.on("--from-ref REF", "When creating a new worktree+branch, the branch/ref to branch from") do |ref|
-      options["from_ref"] = ref
-    end
-
-    op.on("--[no-]start", "Overrides project start option for pre-filled commands") do |start|
-      options["start"] = start
-    end
-
-    op.on("-x [DISTROBOX]", "--distrobox [DISTROBOX]", "Create tmux session within specified distrobox. If blank, run on host (no distrobox).") do |distrobox|
-      options["distrobox"] = distrobox
-    end
-
-    op.on("--detach", "Do not attach to the created tmux session") do
-      options["detach"] = true
-    end
-
-    op.on("--flake", "Attempt to use flake.nix inside project directory via nix shell") do
-      options["flake"] = true
-    end
-
-    op.on("--debug", "Enable debug output") do
-      $debug = true
-    end
-
-    # useful if session needs to wait for difficult to status services
-    op.on("--delay SECONDS", Float, "Number of seconds to wait before starting session") do |seconds|
-      sleep seconds
-    end
-
-    op.on("-h", "--help") do
-      puts op
-      puts example_usage
-    end
-  end.parse(argv)
-  options["abbr"] = args.shift if args.any? && !options["abbr"]
-  options["dir"] = args.shift if args.any? && !options["dir"]
-  options
-end
-
-def host
-  File.read('/etc/hostname').strip
-rescue Errno::ENOENT
-  require 'socket'
-  Socket.gethostname
-end
-
-# listed by precedence, ascending
-def project_config_paths
-  [
-    File.expand_path("~/.config/tproj.yml"),
-    File.expand_path("~/.config/tproj.#{host}.yml")
-  ].select { |path| File.exist? path }
-end
-
-def project_configs
-  project_config_paths.map { |path| YAML.load_file(path) }.reduce(&:merge)
-end
-
-def projects
-  project_configs.map { |key, config| Project.new(key, config) }
-end
-
-def create_project(abbr, dir, windows = 1, *_)
-  windows = [windows.to_i, 1].max
-  Project.new({
-    "abbr"    => abbr,
-    "dir"     => dir,
-    "windows" => windows,
-  })
-end
-
-def find_project(name)
-  projects.each do |project|
-    return project if project.names.member?(name)
+  # Project abbrs are randomized when unconfigured, so everything that asks for
+  # a project has to be looking at the same instances.
+  def self.default
+    @default ||= new
   end
-  nil
+
+  def projects
+    @projects ||= configs.map { |key, config| Project.new(key, config) }
+  end
+
+  def find(name)
+    projects.find { |project| project.names.member?(name) }
+  end
+
+  def abbrs
+    projects.map(&:abbr)
+  end
+
+  def configs
+    config_paths.map { |path| YAML.load_file(path) }.reduce({}, :merge)
+  end
+
+  # listed by precedence, ascending
+  def config_paths
+    [CONFIG, HOST_CONFIG % host]
+      .map { |path| File.expand_path(path) }
+      .select { |path| File.exist? path }
+  end
+
+  def host
+    File.read('/etc/hostname').strip
+  rescue Errno::ENOENT
+    require 'socket'
+    Socket.gethostname
+  end
 end
 
-def fatal_error(msg, exit_status = 1)
-  STDERR.puts msg
-  exit exit_status
+# git queries scoped to one checkout
+class Git < Struct.new(:dir)
+  def call(*args)
+    cmd = ["git", "-C", dir, *args]
+    Trace.echo(cmd)
+    stdout, stderr, status = Open3.capture3(*cmd)
+    [stdout.strip, stderr.strip, status.success?]
+  end
+
+  def repo?
+    ref_exists?("HEAD")
+  end
+
+  def ref_exists?(ref)
+    call("rev-parse", "--verify", "--quiet", ref).last
+  end
+
+  def branch_exists?(branch)
+    ref_exists?("refs/heads/#{branch}")
+  end
+
+  def remote_branch_exists?(branch)
+    call("for-each-ref", "--format=%(refname)", "refs/remotes/*/#{branch}").first.split("\n").any?
+  end
+
+  # Primary branch for the repo: what origin points its HEAD at, else the first
+  # conventional name that exists locally, else whatever the checkout is on.
+  def main_branch
+    head, _stderr, success = call("symbolic-ref", "--short", "refs/remotes/origin/HEAD")
+    return head.split("/", 2).last if success && !head.empty?
+
+    conventional = %w[main master trunk].find { |name| branch_exists?(name) }
+    return conventional if conventional
+
+    current, _stderr, success = call("rev-parse", "--abbrev-ref", "HEAD")
+    success && !current.empty? ? current : "HEAD"
+  end
 end
 
-def debug?
-  $debug
+# The git worktree a project was asked to run in, if any.
+class Worktree < Struct.new(:project)
+  # Ensure the worktree for the requested branch exists, creating the branch too
+  # when it is not already known locally or on a remote.
+  def prepare
+    return unless project.worktree?
+    return if Dir.exist?(dir)
+
+    abort "Not a git repository: #{root}" unless git.repo?
+
+    FileUtils.mkdir_p(File.dirname(dir))
+
+    _stdout, stderr, success = git.call(*add_args)
+    abort "Could not start worktree for #{branch}:\n#{stderr}" unless success
+    puts "Started worktree for #{branch} at #{dir}"
+  end
+
+  def branch
+    project.worktree
+  end
+
+  def dir
+    project.worktree_dir
+  end
+
+  def root
+    project.project_dir
+  end
+
+  def git
+    @git ||= Git.new(root)
+  end
+
+  def known?
+    git.branch_exists?(branch) || git.remote_branch_exists?(branch)
+  end
+
+  def add_args
+    return ["worktree", "add", dir, branch] if known?
+
+    from_ref = project.from_ref.to_s
+    from_ref = git.main_branch if from_ref.empty?
+    ["worktree", "add", "-b", branch, dir, from_ref]
+  end
 end
 
-def find_existing_sessions(proj)
-  cmd = proj.tmux_cmd("list-sessions")
-  puts "$ #{cmd}" if debug?
-  stdout, _stderr, status = Open3.capture3(cmd)
-  if status.success?
-    stdout.split("\n").map {|line| line.split(":").first }
-  else
-    puts "Error: #{_stderr}"
+# The tmux session for a project: resume it if it is already up, otherwise build
+# it out window by window and attach.
+class Session < Struct.new(:project)
+  def call
+    set_terminal_title("tmux: #{project.session}")
+
+    # replaces this process, so execution stops there
+    attach if running?
+
+    Worktree.new(project).prepare
+
+    build
+    run project.tmux_cmd("select-window -t #{project.session}:1")
+
+    attach if project.attach?
+  end
+
+  def running?
+    existing_sessions.member?(project.session)
+  end
+
+  def existing_sessions
+    cmd = project.tmux_cmd("list-sessions")
+    Trace.echo(cmd)
+    stdout, stderr, status = Open3.capture3(cmd)
+    return stdout.split("\n").map { |line| line.split(":").first } if status.success?
+
+    puts "Error: #{stderr}"
     []
   end
-end
 
-def git(dir, *args)
-  cmd = ["git", "-C", dir, *args]
-  puts "$ #{cmd.join(' ')}" if debug?
-  stdout, stderr, status = Open3.capture3(*cmd)
-  [stdout.strip, stderr.strip, status.success?]
-end
-
-def local_ref_exists?(dir, ref)
-  git(dir, "rev-parse", "--verify", "--quiet", ref).last
-end
-
-def remote_branch_exists?(dir, branch)
-  git(dir, "for-each-ref", "--format=%(refname)", "refs/remotes/*/#{branch}").first.split("\n").any?
-end
-
-# Primary branch for the repo: what origin points its HEAD at, else the first
-# conventional name that exists locally, else whatever the checkout is on.
-def main_branch(dir)
-  head, _stderr, success = git(dir, "symbolic-ref", "--short", "refs/remotes/origin/HEAD")
-  return head.split("/", 2).last if success && !head.empty?
-
-  conventional = %w[main master trunk].find { |name| local_ref_exists?(dir, "refs/heads/#{name}") }
-  return conventional if conventional
-
-  current, _stderr, success = git(dir, "rev-parse", "--abbrev-ref", "HEAD")
-  success && !current.empty? ? current : "HEAD"
-end
-
-# Ensure the worktree for the requested branch exists, creating the branch too
-# when it is not already known locally or on a remote.
-def ensure_worktree(proj)
-  return unless proj.worktree?
-  return if Dir.exist?(proj.worktree_dir)
-
-  branch, root = proj.worktree, proj.project_dir
-  fatal_error "Not a git repository: #{root}" unless local_ref_exists?(root, "HEAD")
-
-  known = local_ref_exists?(root, "refs/heads/#{branch}") || remote_branch_exists?(root, branch)
-
-  FileUtils.mkdir_p(File.dirname(proj.worktree_dir))
-
-  args = if known
-    ["worktree", "add", proj.worktree_dir, branch]
-  else
-    from_ref = proj.from_ref.to_s
-    from_ref = main_branch(root) if from_ref.empty?
-    ["worktree", "add", "-b", branch, proj.worktree_dir, from_ref]
-  end
-  _stdout, stderr, success = git(root, *args)
-  fatal_error "Could not start worktree for #{branch}:\n#{stderr}" unless success
-  puts "Started worktree for #{branch} at #{proj.worktree_dir}"
-end
-
-def example_usage
-  puts <<~HELPTEXT
-    Examples:
-
-      $ tproj project-name
-      $ tproj abbr path/to/project
-      $ tproj --distrobox=arch-asdf --windows=5 my-project
-      $ tproj --abbr=acab --dir=projects/police-brutality --windows=2
-      $ tproj dotbox --worktree=feature/thing
-      $ tproj dotbox -b bugfix --worktrees-dir=~/worktrees/dotbox
-
-    Pre-configured projects: #{projects.map(&:abbr).join(', ')}
-  HELPTEXT
-  exit
-end
-
-def find_or_create_project(options)
-  return unless options["abbr"]
-
-  # see if it already exists
-  if project = find_project(options["abbr"])
-    project.apply(options) # merge stored config with any runtime options
-    return project
+  def attach
+    cmd = project.tmux_cmd("attach -t #{project.session}")
+    Trace.echo(cmd, prefix: ">")
+    exec cmd
   end
 
-  # if we have any of these options besides just abbr
-  if %w[dir distrobox windows worktree].any? { |key| options[key] }
-    Project.new(options)
+  def build
+    run project.tmux_cmd("new -s #{project.session} -c #{project.dir} -d")
+
+    delayed = []
+    1.step(to: project.windows) do |n|
+      cmd, label = project.commands[n - 1], project.labels[n - 1]
+      run project.tmux_cmd("new-window -t #{project.session} -c #{project.dir}") unless n == 1
+      delayed << send_keys_cmd(n, cmd) if cmd
+      run project.tmux_cmd("rename-window -t #{project.session}:#{n}", label) if label
+    end
+
+    return if delayed.empty?
+
+    sleep 1 # give shell a chance so prompt is drawn before keys
+    delayed.each { |cmd| system(cmd) }
+  end
+
+  def send_keys_cmd(window, cmd)
+    parts = ["send-keys", "-t", "#{project.session}:#{window}", keys_escape(cmd)]
+    parts << "Enter" if project.start
+
+    project.tmux_cmd(*parts).tap { |full| Trace.echo(full, prefix: "DELAYED$") }
+  end
+
+  # Convert a command into a set of tmux send-keys values
+  def keys_escape(cmd)
+    # encapsulate in quotes and quote existing quotes
+    cmd.inspect
+  end
+
+  def set_terminal_title(title)
+    print "\033]0;#{title}\007"
+  end
+
+  def run(cmd)
+    Trace.echo(cmd)
+    system cmd
   end
 end
 
-def set_terminal_title(title)
-  print "\033]0;#{title}\007"
-end
+class Script < Struct.new(:options)
+  def self.parse_options(argv)
+    options = {}
 
-def run(cmd)
-  puts "$ #{cmd}" if debug?
-  system cmd
-end
+    args = OptionParser.new do |op|
+      op.banner = "Usage: tproj [options] [project_name] [dir]"
 
-# Convert a command into a set of tmux send-keys values
-def keys_escape(cmd)
-  # encapsulate in quotes and quote existing quotes
-  cmd.inspect
-end
+      op.on("-a ABBR", "--abbr ABBR", "Abbreviation for project. Used as tmux session name.") do |abbr|
+        options["abbr"] = abbr
+      end
 
-options = parse_options(ARGV)
+      op.on("-d DIR", "--dir DIR", "Project working directory") do |dir|
+        options["dir"] = dir
+      end
 
-current = find_or_create_project(options)
-example_usage unless current
-current.apply(options)
+      op.on("-w WINDOWS", "--windows WINDOWS", Integer, "Number of tmux windows in project") do |windows|
+        options["windows"] = [windows, 1].max
+      end
 
-set_terminal_title("tmux: #{current.session}")
+      op.on("-b BRANCH", "--worktree BRANCH", "Create/switch to a git worktree for BRANCH and session it there") do |branch|
+        options["worktree"] = branch
+      end
 
-if find_existing_sessions(current).member?(current.session)
-  cmd = current.tmux_cmd("attach -t #{current.session}")
-  puts "> #{cmd}" if debug?
-  exec cmd
-  # ^ replaces process, so execution stops there
-end
+      op.on("--worktrees-dir DIR", "Where worktrees live (default: #{Project::DEFAULT_WORKTREES_DIR}, relative to the project dir)") do |dir|
+        options["worktrees"] = dir
+      end
 
-ensure_worktree(current)
+      op.on("--from-ref REF", "When creating a new worktree+branch, the branch/ref to branch from") do |ref|
+        options["from_ref"] = ref
+      end
 
-# start building up a new tmux session
-run current.tmux_cmd("new -s #{current.session} -c #{current.dir} -d")
-delayed = []
-1.step(to: current.windows) do |n|
-  cmd, label = current.commands[n - 1], current.labels[n - 1]
-  run current.tmux_cmd("new-window -t #{current.session} -c #{current.dir}") unless n == 1
-  if cmd
-    tmux_cmd_parts = [
-      "send-keys",
-      "-t",
-      "#{current.session}:#{n}",
-      keys_escape(cmd),
-    ]
-    tmux_cmd_parts << "Enter" if cmd && current.start
-    full_tmux_cmd = current.tmux_cmd(*tmux_cmd_parts)
-    puts "DELAYED$ #{full_tmux_cmd}" if debug?
-    delayed << full_tmux_cmd
+      op.on("--[no-]start", "Overrides project start option for pre-filled commands") do |start|
+        options["start"] = start
+      end
+
+      op.on("-x [DISTROBOX]", "--distrobox [DISTROBOX]", "Create tmux session within specified distrobox. If blank, run on host (no distrobox).") do |distrobox|
+        options["distrobox"] = distrobox
+      end
+
+      op.on("--detach", "Do not attach to the created tmux session") do
+        options["detach"] = true
+      end
+
+      op.on("--flake", "Attempt to use flake.nix inside project directory via nix shell") do
+        options["flake"] = true
+      end
+
+      op.on("--debug", "Enable debug output") do
+        Trace.enabled = true
+      end
+
+      # useful if session needs to wait for difficult to status services
+      op.on("--delay SECONDS", Float, "Number of seconds to wait before starting session") do |seconds|
+        sleep seconds
+      end
+
+      op.on("-h", "--help") do
+        puts op
+        example_usage
+      end
+    end.parse(argv)
+
+    options["abbr"] = args.shift if args.any? && !options["abbr"]
+    options["dir"] = args.shift if args.any? && !options["dir"]
+
+    self.new options
   end
-  if label
-    run current.tmux_cmd("rename-window -t #{current.session}:#{n}", label)
+
+  def self.example_usage
+    puts <<~HELPTEXT
+      Examples:
+
+        $ tproj project-name
+        $ tproj abbr path/to/project
+        $ tproj --distrobox=arch-asdf --windows=5 my-project
+        $ tproj --abbr=acab --dir=projects/police-brutality --windows=2
+        $ tproj dotbox --worktree=feature/thing
+        $ tproj dotbox -b bugfix --worktrees-dir=~/worktrees/dotbox
+
+      Pre-configured projects: #{ProjectRegistry.default.abbrs.join(', ')}
+    HELPTEXT
+    exit
+  end
+
+  def call
+    project = find_or_create_project
+    self.class.example_usage unless project
+    project.apply(options)
+
+    Session.new(project).call
+  end
+
+  def find_or_create_project
+    return unless options["abbr"]
+
+    # see if it already exists
+    if (project = registry.find(options["abbr"]))
+      project.apply(options) # merge stored config with any runtime options
+      return project
+    end
+
+    # if we have any of these options besides just abbr
+    Project.new(options) if %w[dir distrobox windows worktree].any? { |key| options[key] }
+  end
+
+  def registry
+    ProjectRegistry.default
   end
 end
 
-if delayed.any?
-  sleep 1 # give shell a chance so prompt is drawn before keys
-  delayed.each { |cmd| system(*cmd) }
-end
-
-# move back to first window in case we aren't there anymore
-run current.tmux_cmd("select-window -t #{current.session}:1")
-# finally, attach to the new session
-if current.attach?
-  cmd = current.tmux_cmd("attach -t #{current.session}")
-  puts "> #{cmd}" if debug?
-  exec cmd
-end
+Script.parse_options(ARGV).()
