@@ -1,5 +1,18 @@
 #!/usr/bin/env ruby
 
+# mysql-box
+# ---------
+# Run a throwaway mysqld out of a distrobox, with its data dir, socket and pid
+# file under your home instead of /var. Creates the box from the docker.io/mysql
+# image on first use, and initializes the data dir if it isn't there yet.
+#
+#     mysql-box                     # mysqld on the latest image
+#     mysql-box -v 8.0              # pin the image version
+#     mysql-box -d ~/tmp/mysql      # different data dir
+#     mysql-box -x my-existing-box  # use a box you already have
+#
+# More info: mysql-box -h
+
 require "optparse"
 require "fileutils"
 require "shellwords"
@@ -39,7 +52,11 @@ class Script < Struct.new(:options)
       end
     end.parse(argv)
 
-    self.new options
+    options
+  end
+
+  def self.call(argv)
+    self.new(parse_options(argv)).()
   end
 
   def call
@@ -93,4 +110,4 @@ class Script < Struct.new(:options)
   end
 end
 
-Script.parse_options(ARGV).()
+Script.(ARGV)
