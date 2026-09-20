@@ -1,14 +1,21 @@
 #!/usr/bin/env ruby
 
+# bundle_search
+# -------------
+# Search the current project *and* every gem in its bundle at once, by file
+# contents or by file name. Binary, oversized and vendored files are skipped so
+# the noise stays out of the results.
+#
+#     bundle_search "accounts.yml"     # files containing the string
+#     bundle_search -n "accounts.yml"  # file names containing the string
+#     bundle_search /accounts\.yml/i   # lines matching a regular expression
+#
+# More info: bundle_search -h
+
 require "optparse"
 
-# Usage:
-# bundle_search "accounts.yml" <- Find all files containing the string "accounts.yml"
-# bundle_search -n "accounts.yml" <- Find files with names containing the string "accounts.yml"
-# bundle_search /accounts\.yml/i <- Find files containing lines matching regular expression
-
 MAX_FILE_SIZE = 16 * 1024 * 1024 # 16MB. Don't search files bigger than this.
-MAX_LINE_SIZE = 4098 # we've definitely hit compressed/minified data. skip line.
+MAX_LINE_SIZE = 4096 # we've definitely hit compressed/minified data. skip line.
 
 # we don't need to use `file` to check for text files if these extensions are used
 TEXT_EXTENSIONS = %w[
@@ -43,12 +50,77 @@ IGNORE_PATTERNS = [
   /\.(#{IGNORE_EXTENSIONS.join("|")})$/,
 ]
 
-class Script
-  attr_reader :queries, :options
+class Script < Struct.new(:queries, :options)
+  def self.parse_options(argv)
+    options = {
+      contents:       true,
+      dir:            Dir.pwd,
+      string:         false,
+      regex:          false,
+      ignores:        IGNORE_PATTERNS,
+      keep:           [],
+      max_file_size:  MAX_FILE_SIZE,
+      max_line_size:  MAX_LINE_SIZE,
+      debug:          false,
+    }
 
-  def initialize(queries, options)
-    @queries = queries
-    @options = options
+    queries = OptionParser.new do |op|
+      op.banner = "Usage: bundle_search [options] query"
+
+      op.on("-d DIR", "--dir DIR", "Project working directory") do |dir|
+        options[:dir] = dir
+      end
+
+      op.on("-n", "--names", "Search file names only") do
+        options[:contents] = false
+      end
+
+      op.on("-s", "--string-search", "Force treating query as string search") do
+        options[:string] = true
+      end
+
+      op.on("-r", "--regular-expression", "--regex", "Force treating query as regular expression") do
+        options[:regex] = true
+      end
+
+      op.on("-i IGNORE", "--ignore IGNORE", "Files/folders to not search") do |path|
+        options[:ignores] << path
+      end
+
+      op.on("-k KEEP", "--keep KEEP", "If specified, only files matching these patterns are included") do |path|
+        options[:keep] << path
+      end
+
+      op.on("--debug", "Enable debug (logging) mode") do
+        options[:debug] = true
+      end
+
+      op.on("-h", "--help", "The thing you probably just ran") do
+        puts op, nil
+        example_usage
+      end
+    end.parse(argv)
+
+    [queries, options]
+  end
+
+  def self.example_usage
+    puts <<~USAGEDOC
+      Usage examples:
+
+        # if you don't specify, tries to detect match type based on input format
+        $ bundle_search pattern # string search
+        $ bundle_search /pattern/ # regex
+
+        # using some options
+        $ bundle_search -d project/dir --names search_string
+        $ bundle_search --ignore=warden-1.2.9 --ignore=thor-1.0.1 /needle/
+    USAGEDOC
+    exit
+  end
+
+  def self.call(argv)
+    self.new(*parse_options(argv)).()
   end
 
   def call
@@ -187,76 +259,6 @@ class Script
     match_files { |line| line =~ query }
   end
 
-  def self.parse_options(argv)
-    options = {
-      contents:       true,
-      dir:            Dir.pwd,
-      string:         false,
-      regex:          false,
-      ignores:        IGNORE_PATTERNS,
-      keep:           [],
-      max_file_size:  MAX_FILE_SIZE,
-      max_line_size:  MAX_LINE_SIZE,
-      debug:          false,
-    }
-    args = OptionParser.new do |op|
-      op.banner = "Usage: bundle_search [options] query"
-
-      op.on("-d DIR", "--dir DIR", "Project working directory") do |dir|
-        options[:dir] = dir
-      end
-
-      op.on("--names", "-n", "Search file names only") do
-        options[:contents] = false
-      end
-
-      op.on("--string-search", "-s", "Force treating query as string search") do
-        options[:string] = true
-      end
-
-      op.on("--regular-expression", "--regex", "-r", "Force treating query as regular expression") do
-        options[:regex] = true
-      end
-
-      op.on("-i IGNORE", "--ignore IGNORE", "Files/folders to not search") do |path|
-        options[:ignores] << path
-      end
-
-      op.on("-k KEEP", "--keep KEEP", "If specified, only files matching these patterns are included") do |path|
-        options[:keep] << path
-      end
-
-      op.on("--debug", "-d", "Enable debug (logging) mode") do
-        options[:debug] = true
-      end
-
-      # op.on("--console", "Give a pry console instead of executing search") do
-      #   options[:pry] = true
-      # end
-
-      op.on("-h", "--help") do
-        puts op
-        puts
-        puts example_usage
-        exit
-      end
-    end.parse(argv)
-    new(args, options)
-  end
-
-  def self.example_usage
-    puts <<~USAGEDOC
-      Usage examples:
-
-       # if you don't specify, tries to detect match type based on input format
-       $ bundle_search pattern # string search
-       $ bundle_search /pattern/ # regex
-
-       # using some options
-       $ bundle_search -d project/dir --names search_string
-       $ bundle_search --ignore=warden-1.2.9 --ignore=thor-1.0.1 /needle/
-    USAGEDOC
-  end
 end
 
-Script.parse_options(ARGV).()
+Script.(ARGV)
