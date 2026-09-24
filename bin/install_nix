@@ -22,6 +22,8 @@
 #                               nix.settings.trusted-users.
 #       --nax                   Shorthand for --build-host=nax
 #       --hostname              Specify machine to build (default: `hostname`)
+#   -j, --jobs, --max-jobs=N    Limit nix to N concurrent build jobs
+#       --cores=N               Limit each build job to N cores
 #   -h, --help                  Show this help message
 #
 #
@@ -44,8 +46,10 @@ class Script
       use_sudo:     true,
       upgrade:      false,
       rebuild:      false,
-      gc:           nil, # nil, :auto, or a spec for cleanup-nixos, e.g. "+5"
-      build_host:   nil, # remote host to build on
+      gc:           nil,
+      build_host:   nil,
+      max_jobs:     nil,
+      cores:        nil,
       rebuild_type: "boot",
       install_path: "/etc/nixos",
       host:         default_host,
@@ -130,6 +134,8 @@ class Script
 
     cmd_options = ["--log-format", "bar-with-logs", "--flake", "/etc/nixos##{host}"]
     cmd_options << "--build-host" << build_host if build_host
+    cmd_options << "--max-jobs" << max_jobs.to_s if max_jobs
+    cmd_options << "--cores" << cores.to_s if cores
     cmd_options << "--elevate=sudo" << "--ask-elevate-password" if delegate_elevation?
     rebuild_cmd = ["nixos-rebuild", *cmd_options, rebuild_type]
     rebuild_sudo = use_sudo && !delegate_elevation?
@@ -213,6 +219,14 @@ class Script
         op.on("--build-host=HOST", "Remote host to build nixos packages on. Defaults to empty (local).") do |host|
           parsed[:rebuild] = true
           parsed[:build_host] = host
+        end
+
+        op.on("-j N", "--jobs=N", "--max-jobs=N", Integer, "Limit nix to N concurrent build jobs (0 forces everything to build host).") do |jobs|
+          parsed[:max_jobs] = jobs
+        end
+
+        op.on("--cores=N", Integer, "Limit each nix build job to N cores (0 means all available).") do |cores|
+          parsed[:cores] = cores
         end
 
         op.on("--hostname", "Specify which nix machine to build (defaults to current hostname).") do |name|
