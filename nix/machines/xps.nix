@@ -51,20 +51,23 @@
   # extend the Mic enable sequence to point the ADCs at the digital mics.
   # alsa-lib symlinks its share/alsa/ucm2 into this package, so overriding it
   # reaches PipeWire.
-  nixpkgs.overlays = [
-    (_final: prev: {
-      alsa-ucm-conf = prev.alsa-ucm-conf.overrideAttrs (old: {
-        postInstall = (old.postInstall or "") + ''
-          substituteInPlace $out/share/alsa/ucm2/sof-soundwire/rt715-sdca.conf \
-            --replace-fail \
-              "cset \"name='rt714 FU02 Capture Switch' 1\"" \
-              "cset \"name='rt714 FU02 Capture Switch' 1\"
-		cset \"name='rt714 ADC 22 Mux' DMIC1\"
-		cset \"name='rt714 ADC 23 Mux' DMIC2\""
-        '';
-      });
-    })
-  ];
+  #
+  # Disabling due to this causing updates to take hours of compilation (on frix!)
+  # Also, the mic is still really quiet.
+  # nixpkgs.overlays = [
+  #   (_final: prev: {
+  #     alsa-ucm-conf = prev.alsa-ucm-conf.overrideAttrs (old: {
+  #       postInstall = (old.postInstall or "") + ''
+  #         substituteInPlace $out/share/alsa/ucm2/sof-soundwire/rt715-sdca.conf \
+  #           --replace-fail \
+  #             "cset \"name='rt714 FU02 Capture Switch' 1\"" \
+  #             "cset \"name='rt714 FU02 Capture Switch' 1\"
+	# 	cset \"name='rt714 ADC 22 Mux' DMIC1\"
+	# 	cset \"name='rt714 ADC 23 Mux' DMIC2\""
+  #       '';
+  #     });
+  #   })
+  # ];
 
   services.puma-dev = {
     enable = true;
