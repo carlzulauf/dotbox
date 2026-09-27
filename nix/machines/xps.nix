@@ -32,6 +32,11 @@
     # burpsuite # pentesting
   ];
 
+  programs.captive-browser = {
+    enable = true;
+    interface = "wlp0s20f3";
+  };
+
   # this machine is on public wifi a lot and doesn't need to externally serve models
   services.ollama = {
     host = "127.0.0.1";
