@@ -25,4 +25,12 @@ in
     omnissa-horizon-client
     # devenv # supposed to be magic: https://devenv.sh
   ];
+
+  networking.firewall.allowedTCPPorts = [
+    # default and common rails server ports:
+    3000
+    3111
+    3222
+    3333
+  ];
 }

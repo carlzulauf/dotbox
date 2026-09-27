@@ -36,7 +36,7 @@
     openDefaultPorts = true;
   };
 
-  # `openDefaultPorts` only covers the sync ports, never the GUI, so 8384 stays
-  # firewalled off by default.
-  networking.firewall.allowedTCPPorts = [ 8384 ];
+  networking.firewall.allowedTCPPorts = [
+    8384 # syncthing GUI
+  ];
 }
