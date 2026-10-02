@@ -26,6 +26,16 @@
 
   # nix.settings.substituters = [ "http://nax/" ];
 
+  # This machine is a --build-host for other nix machines. If we let nix-daemon
+  # pick the number of concurrent build jobs, this machine will often encounter
+  # an OOM situation on larger build jobs. Limit the nuber of concurrent build
+  # processes to just a couple, and the halve the number of cores from the max
+  # so that jellyfin and other services have resources available.
+  nix.settings = {
+    max-jobs = 2;
+    cores = 8;
+  };
+
   # lsblk --output NAME,SIZE,TYPE,MOUNTPOINTS,UUID
   fileSystems."/mnt/ocean1" = {
     device = "/dev/disk/by-uuid/3a2123a9-49bf-4786-b815-84e191158c3e";
