@@ -26,6 +26,29 @@ let
   nixDirenvPinned = (useNixDirenv312 nixDirenv).overrideAttrs (_: {
     src = useNixDirenv312 nixDirenv.unresholved;
   });
+
+  # environment.enableAllTerminfo = true is the one-liner version of this, but it
+  # force-builds every terminal in its list, so one broken terminal blocks the
+  # rebuild of every machine. The gcc 16 switch in nixpkgs broke two of them:
+  #
+  #   rxvt-unicode 9.31 - rxvtutil.h defines its own lerp() template, now
+  #     ambiguous against C++20's std::lerp, so rxvttoolkit.C won't compile.
+  #   contour           - Image.cpp uses std::experimental::simd, which gcc 16
+  #     no longer ships.
+  #
+  # Neither is fixed upstream and nothing here uses either terminal, so install
+  # the module's list (nixos/modules/config/terminfo.nix) minus those two. Go back
+  # to `environment.enableAllTerminfo = true` once they compile again.
+  #
+  # For now, this list has been trimmed to terminals I actually use or am likely
+  # to encounter.
+  terminfoPackages = map (p: p.terminfo) (with pkgs.pkgsBuildBuild; [
+    alacritty
+    foot
+    ghostty
+    kitty
+    tmux
+  ]);
 in
 {
   config = {
@@ -110,7 +133,9 @@ in
       # nixpkgs-master.opencode
       nixpkgs-master.pi-coding-agent
       nixpkgs-master.agent-browser
-    ];
+    ]
+    # terminfo for ghostty/kitty/foot/etc so remote tmux sessions work
+    ++ terminfoPackages;
 
     programs.direnv = {
       enable = true;
@@ -127,9 +152,6 @@ in
 
     # Expose pkg-config files from all system packages so native gem compilation works
     environment.pathsToLink = [ "/lib/pkgconfig" ];
-
-    # enable terminfo support for ghostty/kitty/foot/etc so remote tmux sessions work
-    environment.enableAllTerminfo = true;
 
     environment.variables = rec {
       EDITOR = "micro";
