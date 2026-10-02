@@ -71,6 +71,7 @@ in
       edk2-uefi-shell.enable = true;
       configurationLimit = lib.mkDefault 5; # some machines have bigger /boot
     };
+    boot.initrd.systemd.emergencyAccess = true;
     boot.loader.efi.canTouchEfiVariables = true;
 
     boot.supportedFilesystems = [ "ntfs" ];
