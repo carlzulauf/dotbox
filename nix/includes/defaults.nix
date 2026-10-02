@@ -198,8 +198,12 @@ in
       uri = "https://exalog.mrks.io/network_manager_check";
       response = "NetworkManager is online";
     };
-    # needed to make wireguard connections work:
-    networking.firewall.checkReversePath = "loose";
+    networking.firewall = {
+      # needed to make wireguard connections work:
+      checkReversePath = "loose";
+      # trust everything on our tailnet, for science:
+      trustedInterfaces = [ "tailscale0" ];
+    };
 
     # needed for tailscale to work, and probably better
     services.resolved.enable = true;
@@ -229,6 +233,7 @@ in
       enable = true;
       #package = nixpkgs-master.tailscale;
       useRoutingFeatures = "both";
+      openFirewall = true; # allow tailscale UDP so direct connections are fast
     };
 
     # turn on openssh server with sane settings

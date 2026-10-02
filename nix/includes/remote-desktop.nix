@@ -111,13 +111,10 @@ in
   config = lib.mkMerge [
     {
       environment.systemPackages = [ rdp ];
-      # Only reachable over the tailnet, never the LAN/public interfaces.
-      networking.firewall.interfaces.${tailnet}.allowedTCPPorts = [ livePort ];
     }
 
     (lib.mkIf gnome {
       services.gnome.gnome-remote-desktop.enable = true;
-      networking.firewall.interfaces.${tailnet}.allowedTCPPorts = [ loginPort ];
 
       # Installed, but left switched off: enable it by hand once per machine,
       # like the other extensions. Nothing here can do it, because gnome-shell
