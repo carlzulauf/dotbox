@@ -49,6 +49,14 @@ let
     kitty
     tmux
   ]);
+
+  # Bounded stand-in for micro's wl-clipboard calls, which hang forever when
+  # the compositor can't hand out focus (e.g. ssh'd into a locked session).
+  microClip = pkgs.writeShellApplication {
+    name = "micro-clip";
+    runtimeInputs = with pkgs; [ coreutils wl-clipboard systemd ];
+    text = builtins.readFile ./micro-clip.sh;
+  };
 in
 {
   config = {
@@ -108,7 +116,7 @@ in
       kpcli # keepass CLI
       lm_sensors smartmontools pciutils
       btrfs-progs wireguard-tools
-      nano micro vim
+      nano micro microClip vim
       git git-absorb lazygit tig gh
       tmux fish
       eza file fzf starship tldr
