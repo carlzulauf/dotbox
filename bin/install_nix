@@ -82,6 +82,7 @@ class Script
   end
 
   def call
+    keep_sudo_alive if use_sudo
     copy_nix_files
     nixos_rebuild
     collect_garbage
@@ -94,6 +95,21 @@ class Script
     unless status
       puts "Command failed: #{cmd}"
       exit
+    end
+  end
+
+  # Prompt for sudo once up front (or not at all if the ticket is still fresh),
+  # then keep refreshing the ticket in the background so that later sudo calls
+  # -- notably nixos-rebuild's activation after a long build -- never re-prompt.
+  # `sudo -n -v` never prompts; it just extends the existing ticket.
+  def keep_sudo_alive
+    run "sudo", "--validate"
+
+    Thread.new do
+      loop do
+        sleep 60
+        system("sudo", "--non-interactive", "--validate", out: File::NULL, err: File::NULL)
+      end
     end
   end
 
@@ -118,11 +134,12 @@ class Script
   # has to have ssh keys accepted by root@{build-host}, which is not ideal.
   #
   # When --build-host is present, we now run the command without sudo, but
-  # --elevate=sudo --ask-elevate-password, so `nixos-rebuild` elevates as needed
-  # to activate the newly built generation (via sudo), and ask the password
-  # upfront so we hopefully don't timeout. The ssh to the build-host happens as
-  # the current user, and the build host will still build to its store if the
-  # user is in nix.settings.trusted-users
+  # with --elevate=sudo, so `nixos-rebuild` prefixes only its local activation
+  # commands with sudo. That sudo reuses the ticket kept fresh by
+  # keep_sudo_alive, so it doesn't prompt again. (--ask-elevate-password is
+  # avoided because it always prompts and bypasses the ticket.) The ssh to the
+  # build-host happens as the current user, and the build host will still build
+  # to its store if the user is in nix.settings.trusted-users
   def delegate_elevation?
     !build_host.nil? && use_sudo
   end
@@ -136,7 +153,7 @@ class Script
     cmd_options << "--build-host" << build_host if build_host
     cmd_options << "--max-jobs" << max_jobs.to_s if max_jobs
     cmd_options << "--cores" << cores.to_s if cores
-    cmd_options << "--elevate=sudo" << "--ask-elevate-password" if delegate_elevation?
+    cmd_options << "--elevate=sudo" if delegate_elevation?
     rebuild_cmd = ["nixos-rebuild", *cmd_options, rebuild_type]
     rebuild_sudo = use_sudo && !delegate_elevation?
 
