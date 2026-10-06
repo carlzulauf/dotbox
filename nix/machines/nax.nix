@@ -16,6 +16,7 @@
       nixos-hardware.nixosModules.common-gpu-amd
       ../includes/ai.nix
       ../includes/gui.nix
+      ../includes/t3code.nix
       ../includes/tv.nix
     ];
 
