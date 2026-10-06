@@ -130,6 +130,7 @@ in
       ../includes/gnome-cosmic.nix
       ../includes/dev.nix
       ../includes/printing.nix
+      ../includes/t3code.nix
     ];
 
   environment.systemPackages = with pkgs; [

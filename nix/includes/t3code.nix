@@ -55,11 +55,21 @@ let
     claude-code = nixpkgs-master.claude-code;
     enableCodex = false;
   };
+
+  # Just the `t3` CLI and its completions, leaving out the t3code-desktop
+  # Electron app and its menu entry. The desktop app starts its own backend
+  # on the same ~/.t3/userdata as the service, so launching it on a host that
+  # runs the service would put two servers on one database. Use the browser.
+  t3cli = pkgs.runCommand "t3-cli-${t3code.version}" { } ''
+    mkdir -p $out/bin $out/share
+    ln -s ${t3code}/bin/t3 $out/bin/t3
+    ln -s ${t3code}/share/{bash-completion,fish,zsh} $out/share/
+  '';
 in
 {
   # For `t3 auth`, `t3 project`, and `t3 pair` against the running server.
   # These read the same ~/.t3 as the service.
-  environment.systemPackages = [ t3code ];
+  environment.systemPackages = [ t3cli ];
 
   systemd.user.services.t3code = {
     description = "T3 Code server";
