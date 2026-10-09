@@ -10,13 +10,17 @@
 
     # used for better per-machine hardware support
     nixos-hardware.url = "github:NixOS/nixos-hardware/master";
+    nixos-hardware.inputs.nixpkgs.follows = "nixpkgs";
 
     # reverse proxy that sets up per app subdomains on
     #  port 80/443 with SSL for locally running apps (ie: dev)
     puma-dev.url = "github:carlzulauf/puma-dev-flake";
+    puma-dev.inputs.nixpkgs.follows = "nixpkgs";
+    puma-dev.inputs.flake-utils.follows = "ds4/flake-utils";
 
     # Nix flake for DwarfStar, model runner for DeepSeek V4 Flash/Pro
     ds4.url = "github:carlzulauf/ds4.nix";
+    ds4.inputs.nixpkgs.follows = "nixpkgs";
   };
 
   outputs = {
