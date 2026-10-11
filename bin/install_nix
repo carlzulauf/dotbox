@@ -12,7 +12,8 @@
 #   -b, --boot                  Rebuild in 'boot' mode (active next boot)
 #   -u, --upgrade, --update     Update flake.lock and rebuild
 #   -r, --rebuild               Run nixos-rebuild after copying configs
-#       --no-rebuild            Disable rebuild (overrides other settings)
+#       --no-rebuild            Disable rebuild, and the flake update with it
+#                               (wins over every other option, in any order)
 #   -g, --gc[=SPEC]             Run cleanup-nixos after a successful rebuild.
 #                               SPEC must be attached (--gc=30d, -g+3); with no
 #                               SPEC, cleanup-nixos uses configurationLimit.
@@ -35,7 +36,7 @@
 #   - ruby
 #   - rsync
 #   - nix (flake commands)
-#   - sudo access (configurable via --use-sudo/--no-use-sudo if needed)
+#   - sudo access
 #   - cleanup-nixos (home/.local/bin), only when --gc is used
 
 require 'optparse'
@@ -143,7 +144,9 @@ class Script
   end
 
   def nixos_rebuild
-    if upgrade
+    # An update that isn't built would never be copied back to the repo, and
+    # the next install would overwrite it, so it only runs with a rebuild.
+    if upgrade && rebuild
       run "nix", "flake", "update", "--flake", install_path, sudo: use_sudo
     end
 
@@ -196,9 +199,11 @@ class Script
   end
 
   def parse_options(argv)
+    no_rebuild = false
+
     {}.tap do |parsed|
       remainders = OptionParser.new do |op|
-        op.on("--upgrade", "--update", "-u", "Update system flake and run nixos-rebuild with '--upgrade'") do
+        op.on("--upgrade", "--update", "-u", "Upgrade: update every input in flake.lock, then rebuild") do
           parsed[:upgrade] = true
           parsed[:rebuild] = true
         end
@@ -207,8 +212,9 @@ class Script
           parsed[:rebuild] = true
         end
 
+        # Applied after parsing, so it wins whatever order the options come in.
         op.on("--no-rebuild", "Do not rebuild nixos after installing configs. Overrides any other setting.") do
-          parsed[:rebuild] = false
+          no_rebuild = true
         end
 
         # SPEC must be attached (--gc=30d, -g+3); bare --gc defers to configurationLimit.
@@ -255,6 +261,7 @@ class Script
       end.parse(argv)
       host = remainders.first
       parsed[:host] = host unless host.nil? || host.empty?
+      parsed[:rebuild] = false if no_rebuild
     end
   end
 
