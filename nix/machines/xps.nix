@@ -52,4 +52,7 @@
     enable = true;
     user = "carl";
   };
+
+  # The release this machine was first installed with. Never change it.
+  system.stateVersion = "24.05";
 }

@@ -53,4 +53,7 @@
   # programs.iio-hyprland.enable = true;
   # services.hypridle.enable = true;
   # programs.hyprlock.enable = true;
+
+  # The release this machine was first installed with. Never change it.
+  system.stateVersion = "24.05";
 }

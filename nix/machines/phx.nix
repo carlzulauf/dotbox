@@ -74,4 +74,7 @@
   # Make the lid just lock, not suspend. I'll have to enter suspend manually.
   services.logind.lidSwitch = "lock";
   services.fwupd.enable = true;
+
+  # The release this machine was first installed with. Never change it.
+  system.stateVersion = "24.05";
 }

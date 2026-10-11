@@ -156,4 +156,7 @@
     };
 
   time.timeZone = "America/Denver";
+
+  # The release this machine was first installed with. Never change it.
+  system.stateVersion = "24.05";
 }
