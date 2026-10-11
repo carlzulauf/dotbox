@@ -32,6 +32,12 @@
     ...
   }@attrs:
   let
+    specialArgs = attrs // {
+      nixpkgs-master = import attrs.nixpkgs-master {
+        system = "x86_64-linux";
+        config.allowUnfree = true;
+      };
+    };
     activeHosts = [
       "generic" # Base host for initial installs (no hardware-specific config)
       "frix" # Framework Desktop
@@ -46,12 +52,7 @@
     ];
     mkHost = host: nixpkgs.lib.nixosSystem {
       system = "x86_64-linux";
-      specialArgs = attrs // {
-        nixpkgs-master = import attrs.nixpkgs-master {
-          system = "x86_64-linux";
-          config.allowUnfree = true;
-        };
-      };
+      inherit specialArgs;
       modules = [
         ./configuration.nix
         ./includes/defaults.nix
@@ -63,12 +64,7 @@
     };
     mkIso = nixpkgs.lib.nixosSystem {
       system = "x86_64-linux";
-      specialArgs = attrs // {
-        nixpkgs-master = import attrs.nixpkgs-master {
-          system = "x86_64-linux";
-          config.allowUnfree = true;
-        };
-      };
+      inherit specialArgs;
       modules = [ ./iso.nix ];
     };
   in

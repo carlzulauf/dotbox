@@ -115,7 +115,7 @@ in
       btrfs-progs wireguard-tools
       nano micro microClip vim
       git git-absorb lazygit tig gh
-      tmux fish
+      tmux
       eza file fzf starship tldr
       wget curl dig sshfs yt-dlp
       nethogs nmap whois ethtool iw
@@ -128,8 +128,6 @@ in
       python3
       nodejs
       ruby_4_0
-
-      syncthing tailscale
 
       docker-compose
       distrobox

@@ -47,7 +47,6 @@ let
 
   gnome = config.services.desktopManager.gnome.enable;
   plasma = config.services.desktopManager.plasma6.enable;
-  tailnet = config.services.tailscale.interfaceName;
 
   # Home of the gnome-remote-desktop system user (created by its tmpfiles.d).
   grdStateDir = "/var/lib/gnome-remote-desktop";

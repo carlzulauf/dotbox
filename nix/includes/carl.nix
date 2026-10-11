@@ -19,11 +19,10 @@
   users.users.carl = {
     isNormalUser = true;
     description = "Carl Zulauf";
-    extraGroups = [ "networkmanager" "video" "wheel" "docker" "libvirtd" ];
+    extraGroups = [ "networkmanager" "video" "wheel" "libvirtd" ];
     packages = with pkgs; [
       # maybe add some user specific pkgs
     ];
-    shell = pkgs.fish;
     linger = true;
   };
 
