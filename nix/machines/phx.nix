@@ -15,6 +15,7 @@
       # nixos-hardware.nixosModules.common-gpu-amd
       nixos-hardware.nixosModules.gpd-win-max-2-2023
 
+      ../includes/ai.nix
       ../includes/gui.nix
       ../includes/gnome.nix
       ../includes/gaming.nix
@@ -73,18 +74,4 @@
   # Make the lid just lock, not suspend. I'll have to enter suspend manually.
   services.logind.lidSwitch = "lock";
   services.fwupd.enable = true;
-
-  services.ollama = {
-    # package = nixpkgs-stable.legacyPackages.x86_64-linux.ollama;
-    acceleration = "rocm";
-    enable = true;
-    host = "0.0.0.0";
-  };
-
-  services.open-webui = {
-    enable = true;
-    host = "0.0.0.0";
-    port = 4141; # AI! AI!
-    openFirewall = true;
-  };
 }
