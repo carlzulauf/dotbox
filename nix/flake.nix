@@ -50,10 +50,18 @@
       "xps"  # Work XPS
       "xtv"  # TV Gaming
     ];
+    # Each machine's hardware-configuration.nix, checked in under hardware/ by
+    # bin/install_nix. Hosts not checked in yet, and generic, use the one
+    # generated in /etc/nixos.
+    hardwareConfig = host:
+      if builtins.pathExists ./hardware/${host}.nix
+      then ./hardware/${host}.nix
+      else ./hardware-configuration.nix;
     mkHost = host: nixpkgs.lib.nixosSystem {
       system = "x86_64-linux";
       inherit specialArgs;
       modules = [
+        (hardwareConfig host)
         ./configuration.nix
         ./includes/defaults.nix
         ./includes/carl.nix

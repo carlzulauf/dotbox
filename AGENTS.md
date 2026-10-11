@@ -8,6 +8,7 @@ Provides a guide to agents or others for working in this repo.
 * nix/ - Contains base NixOS configuration
 * nix/includes - Contains reusable nix modules that are included in machine configs
 * nix/machines - Contains per-physical-machine configs for user's NixOS systems
+* nix/hardware - Each machine's hardware-configuration.nix, checked in by bin/install_nix
 * home/ - Dotfiles symlinked to user's home directory.
 * home-files/ - Dotfiles copied to the user's home directory.
 * hooks/ - Scripts executed after dotfiles are installed
@@ -23,6 +24,11 @@ optionally rebuild the system.
 `nixos-rebuild` directly from the source tree. It **copies** files to
 `/etc/nixos` first, then runs `nixos-rebuild` from there. This is because
 NixOS's `nixos-rebuild` expects its config at `/etc/nixos/` by default.
+
+Before copying, it syncs the machine's `/etc/nixos/hardware-configuration.nix`
+with `nix/hardware/<host>.nix`: the `/etc/nixos` copy replaces the repo copy
+when that is missing or different, and is restored from the repo when it is
+missing. The flake builds with the repo copy when there is one.
 
 ---
 

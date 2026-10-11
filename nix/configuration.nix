@@ -5,12 +5,6 @@
 { config, pkgs, ... }:
 
 {
-  imports =
-    [
-      # Include the results of the automated hardware scan.
-      ./hardware-configuration.nix
-    ];
-
   nix.settings = {
     extra-substituters = [ "https://cache.numtide.com" ];
     extra-trusted-public-keys = [

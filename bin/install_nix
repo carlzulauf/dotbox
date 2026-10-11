@@ -39,6 +39,7 @@
 #   - sudo access
 #   - cleanup-nixos (home/.local/bin), only when --gc is used
 
+require 'fileutils'
 require 'optparse'
 
 class Script
@@ -84,6 +85,7 @@ class Script
 
   def call
     keep_sudo_alive if use_sudo
+    sync_hardware_config
     copy_nix_files
     nixos_rebuild
     collect_garbage
@@ -111,6 +113,29 @@ class Script
         sleep 60
         system("sudo", "--non-interactive", "--validate", out: File::NULL, err: File::NULL)
       end
+    end
+  end
+
+  # Each machine's hardware-configuration.nix is generated in /etc/nixos and
+  # checked into the repo as nix/hardware/<host>.nix, which the flake builds
+  # with. The /etc/nixos copy wins: it replaces the repo copy when that is
+  # missing or different, and is restored from the repo when it is missing.
+  # Only done for the machine being installed on, and never for generic, which
+  # is installed on whatever hardware is at hand.
+  def sync_hardware_config
+    return if host != self.class.default_host || host == "generic"
+
+    installed = File.join(install_path, "hardware-configuration.nix")
+    tracked = File.join(config_dir, "hardware", "#{host}.nix")
+
+    if File.exist?(installed)
+      return if File.exist?(tracked) && FileUtils.compare_file(installed, tracked)
+
+      FileUtils.mkdir_p(File.dirname(tracked))
+      run "cp", installed, tracked
+      puts "Updated #{tracked} from #{installed}; commit it to the repo."
+    elsif File.exist?(tracked)
+      run "cp", tracked, installed, sudo: use_sudo
     end
   end
 
