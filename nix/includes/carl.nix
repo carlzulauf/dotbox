@@ -32,11 +32,9 @@
     enable = true;
     user = "carl";
     dataDir = "/home/carl";
+    # Listens everywhere, but only the sync ports are opened, so the GUI is
+    # reachable over the tailnet (trusted, see defaults.nix) and not the LAN.
     guiAddress = "0.0.0.0:8384";
     openDefaultPorts = true;
   };
-
-  networking.firewall.allowedTCPPorts = [
-    8384 # syncthing GUI
-  ];
 }
