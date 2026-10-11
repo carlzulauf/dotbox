@@ -18,7 +18,18 @@
       ../includes/gui.nix
       ../includes/t3code.nix
       ../includes/tv.nix
+      # web access over the tailnet, trialing both stacks side by side
+      ../includes/web-terminal.nix  # :7681 ttyd (fish login shell)
+      ../includes/codium-server.nix # :4444 VSCodium (web)
+      ../includes/cockpit.nix       # :9090 Cockpit + cockpit-files
+      ../includes/filebrowser.nix   # :8088 FileBrowser Quantum
     ];
+
+  dotbox.filebrowser.extraSources = {
+    files = "/mnt/files/carl";
+    vault = "/mnt/vault/carl";
+    downloads = "/mnt/downloads/carl";
+  };
 
   environment.systemPackages = with pkgs; [
     nvtopPackages.amd
