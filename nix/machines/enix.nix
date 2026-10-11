@@ -29,6 +29,9 @@
       ../includes/printing.nix
       ../includes/gnome.nix
       ../includes/gnome-cosmic.nix
+      # not much of a gaming device, but will be used to stream games.
+      # gets steam, but doesn't need the full gaming.nix
+      ../includes/steam.nix
     ];
 
   environment.systemPackages = with pkgs; [
@@ -50,17 +53,4 @@
   # programs.iio-hyprland.enable = true;
   # services.hypridle.enable = true;
   # programs.hyprlock.enable = true;
-
-  # not much of a gaming device, but will be used to stream games.
-  # gets steam, but doesn't need the full gaming.nix
-  hardware.steam-hardware.enable = true;
-  programs.steam = {
-    enable = true;
-    remotePlay.openFirewall = true;
-    dedicatedServer.openFirewall = true;
-    localNetworkGameTransfers.openFirewall = true;
-    gamescopeSession.enable = true;
-    protontricks.enable = true;
-  };
-  programs.gamescope.enable = true;
 }

@@ -130,6 +130,7 @@ in
       ../includes/gnome-cosmic.nix
       ../includes/dev.nix
       ../includes/printing.nix
+      ../includes/steam.nix
       ../includes/t3code.nix
     ];
 
@@ -158,10 +159,7 @@ in
     ];
   };
 
-  hardware.steam-hardware.enable = true;
   programs.steam = {
-    enable = true;
-
     # frix is the Remote Play host, running GNOME on Wayland. Two separate
     # problems stop that from working hands-off:
     #
@@ -181,12 +179,6 @@ in
     # given at the desk. extest reimplements XTest on /dev/uinput (uaccess'd by
     # steam-hardware) so the portal is never involved.
     extest.enable = true;
-
-    remotePlay.openFirewall = true;
-    dedicatedServer.openFirewall = true;
-    localNetworkGameTransfers.openFirewall = true;
-    gamescopeSession.enable = true;
-    protontricks.enable = true;
   };
 
   services.fwupd.enable = true;
