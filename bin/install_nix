@@ -94,7 +94,7 @@ class Script
     status = system(*cmd)
     unless status
       puts "Command failed: #{cmd}"
-      exit
+      exit 1
     end
   end
 
