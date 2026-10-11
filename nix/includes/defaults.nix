@@ -1,12 +1,5 @@
 { config, pkgs, lib, nixpkgs-master, ... }:
 let
-  # pinnedRuby = import (builtins.fetchTarball {
-  #   url = "https://github.com/NixOS/nixpkgs/archive/83e1ebb0c67cb310adeeabf6c4ab6218dbad403d.tar.gz";
-  #   sha256 = "sha256:1ihv7xxqg9irc1kimnhdyspa7ckfw73646r36008v3d2c3a2q1bs";
-  # }) {
-  #   system = "x86_64-linux";
-  # };
-
   # nix-direnv 3.2.0 misbehaves when several tmux windows load the same
   # flake-based .envrc at once, so stay on 3.1.2 (latest 3.1.x) until that's
   # fixed upstream. resholve builds nix-direnv in two stages, so the older
@@ -134,7 +127,6 @@ in
       terraform
 
       nixpkgs-master.claude-code
-      # nixpkgs-master.opencode
       nixpkgs-master.pi-coding-agent
       nixpkgs-master.agent-browser
     ]
@@ -214,13 +206,6 @@ in
 
     # Nix daemon config
     nix = {
-      # Automate garbage collection
-      # gc = {
-      #   automatic = true;
-      #   dates = "weekly";
-      #   options = "--delete-older-than 7d";
-      # };
-
       settings = {
         # Automate `nix store --optimise`
         auto-optimise-store = true;
@@ -235,7 +220,6 @@ in
 
     services.tailscale = {
       enable = true;
-      #package = nixpkgs-master.tailscale;
       useRoutingFeatures = "both";
       openFirewall = true; # allow tailscale UDP so direct connections are fast
     };
@@ -251,14 +235,12 @@ in
 
     # configure podman
     virtualisation.podman.enable = true;
-    # virtualisation.podman.dockerCompat = true; # basically, podman-docker
 
     # configure docker
     # enable rootless mode
     virtualisation.docker.rootless = {
       enable = true;
       setSocketVariable = true;
-      # daemon.settings.dns = [ "100.100.100.100" ];
     };
   };
 }

@@ -63,37 +63,13 @@
       autoSuspend = false;
     };
     # Enable the GNOME Desktop Environment.
-    desktopManager.gnome = {
-      enable = true;
-      # extraGSettingsOverridePackages = [ pkgs.mutter ];
-      # extraGSettingsOverrides = ''
-      #   [org.gnome.mutter]
-      #   experimental-features=['scale-monitor-framebuffer']
-      # '';
-    };
+    desktopManager.gnome.enable = true;
   };
 
   # Configure GNOME
   services.gnome.games.enable = true;
-  # services.gnome.gnome-remote-desktop.enable = true;
-
-  # services.xrdp = {
-  #   enable = true;
-  #   openFirewall = true;
-  #   defaultWindowManager = "gnome-session";
-  # };
 
   programs.gnome-terminal.enable = true;
-
-  # Prevent GDM (gnome display manager) login from timing out and suspending
-  # verity with:
-  #  $ gsettings list-recursively org.gnome.settings-daemon.plugins.power
-  # programs.dconf.profiles.gdm.databases = [{
-  #  settings."org/gnome/settings-daemon/plugins/power" = {
-  #    sleep-inactive-ac-type = "nothing";
-  #    sleep-inactive-ac-timeout = lib.gvariant.mkInt32 0;
-  #  };
-  #}];
 
   virtualisation.libvirtd = {
     enable = true;
@@ -103,9 +79,6 @@
       vhostUserPackages = with pkgs; [ virtiofsd ];
     };
   };
-
-  /* disabled due to libpeas-2.0.1 build error (lua51 missing) */
-  /* services.gnome.core-developer-tools.enable = true; */
 
   # desktop applications list: ll /run/current-system/sw/share/applications/
   xdg.mime.defaultApplications = {

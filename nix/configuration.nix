@@ -9,16 +9,8 @@
     [
       # Include the results of the automated hardware scan.
       ./hardware-configuration.nix
-      # ./includes/defaults.nix
-      # machine specific configs, like hostname, screen rotation, etc
-      # ./machine.nix
     ];
 
-  # use binary cache on local network, if we can see it
-  # nix.settings.substituters = [
-  #   "http://192.168.35.229/"
-  #   "https://cache.nixos.org/"
-  # ];
   nix.settings = {
     extra-substituters = [ "https://cache.numtide.com" ];
     extra-trusted-public-keys = [

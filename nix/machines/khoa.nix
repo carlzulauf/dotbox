@@ -10,7 +10,6 @@
       nixos-hardware.nixosModules.common-pc-laptop
       nixos-hardware.nixosModules.common-pc-ssd
       nixos-hardware.nixosModules.common-cpu-intel
-      # nixarr.nixosModules.default
       ../includes/gui.nix
       ../includes/printing.nix
     ];
@@ -26,7 +25,6 @@
     kdePackages.partitionmanager kdePackages.plasma-disks kdePackages.kate
     qbittorrent qbittorrent-nox
     deskflow
-    # jellyfin jellyfin-ffmpeg jellyfin-web
   ];
 
   # lsblk --output NAME,SIZE,TYPE,MOUNTPOINTS,UUID
@@ -83,65 +81,5 @@
     # package = pkgs.qbitorrent-nox; # this should already be the default
   };
 
-  # services.snapraid = {
-  #   enable = true;
-
-  #   parityFiles = [
-  #     "/mnt/backup/snapraid.parity"
-  #   ];
-
-  #   dataDisks = {
-  #     d1 = "/mnt/files";
-  #     d2 = "/mnt/vault";
-  #   };
-
-  #   contentFiles = [
-  #     "/mnt/backup/snapraid.content"
-  #     "/mnt/ocean1/snapraid.content"
-  #     "/home/carl/snapraid.content"
-  #   ];
-  # };
-
-  # services.jellyfin =
-  #   let
-  #     configBaseDir = "/home/carl/.local/share/jellyfin";
-  #   in
-  #   {
-  #     enable = true;
-  #     openFirewall = true;
-  #     user = "carl";
-  #     dataDir = configBaseDir;
-  #     logDir = "${configBaseDir}/log";
-  #     cacheDir = "${configBaseDir}/cache";
-  #     configDir = "${configBaseDir}/config";
-  #   };
-
-  # nixarr = {
-  #   enable = true;
-  #   mediaDir = "/mnt/fountain/nixarr/media";
-  #   stateDir = "/mnt/fountain/nixarr/state";
-  #   vpn = {
-  #     enable = true;
-  #     wgConf = "/home/carl/projects/dotbox-private/wireguard/denver/wg0.conf";
-  #   };
-  #   transmission = {
-  #     enable = true;
-  #     vpn.enable = true;
-  #     # peerPort = 51820;
-  #     # extraAllowedIps = [
-  #     #   "100.64.0.0/10"
-  #     #   "192.168.0.0/16"
-  #     #   "127.0.0.1"
-  #     # ];
-  #     extraSettings = {
-  #       rpc-host-whitelist = "khoa,transmission.mrks.io";
-  #     };
-  #   };
-  #   radarr.enable = true;
-  #   sonarr.enable = true;
-  # };
-
   time.timeZone = "America/Chicago";
 }
-
-# TODO: shut down qbittorrent, disconnect from wireguard, try installing this stuff
