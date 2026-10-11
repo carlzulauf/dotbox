@@ -113,21 +113,19 @@ class Script
     end
   end
 
+  # Mirror the whole nix/ tree, deleting anything in install_path that is no
+  # longer in the repo, so renamed or removed files don't linger there.
+  # hardware-configuration.nix is generated on each machine and isn't in nix/,
+  # so it is excluded to keep --delete from removing it.
   def copy_nix_files
-    %w[configuration.nix flake.nix flake.lock].each do |file|
-      run "cp", File.join(config_dir, file), File.join(install_path, file), sudo: use_sudo
-    end
-
-    %w[includes machines pkgs].each do |dir|
-      next unless File.exist?(File.join(config_dir, dir))
-
-      run(
-        "rsync", "--archive",
-        File.join(config_dir, "#{dir}/"),
-        File.join(install_path, dir),
-        sudo: use_sudo
-      )
-    end
+    run(
+      "rsync", "--archive", "--delete",
+      "--exclude=/hardware-configuration.nix",
+      *(use_sudo ? ["--chown=root:root"] : []),
+      "#{config_dir}/",
+      "#{install_path}/",
+      sudo: use_sudo
+    )
   end
 
   # `sudo nixos-rebuild` causes --build-host to ssh as root, which means /root
