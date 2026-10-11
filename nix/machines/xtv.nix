@@ -21,7 +21,6 @@
   boot.kernelPackages = pkgs.linuxPackages_latest;
 
   environment.systemPackages = with pkgs; [
-    vulkan-tools # vulkaninfo for GPU debugging
     nvtopPackages.amd
   ];
 
@@ -31,12 +30,6 @@
       title = "Windows 11";
       efiDeviceHandle = "HD1b";
     };
-  };
-
-  hardware.graphics = {
-    enable = true;
-    enable32Bit = true;
-    extraPackages = with pkgs; [ vulkan-tools ];
   };
 
   time.timeZone = "America/Chicago";

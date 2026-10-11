@@ -50,10 +50,6 @@
     "amdgpu.ppfeaturemask=0xfff7ffff"
   ];
 
-  # From https://nixos.wiki/wiki/AMD_GPU
-  # "Make the kernel use the correct driver early"
-  boot.initrd.kernelModules = [ "amdgpu" ];
-
   # allow manual power/speed control
   hardware.amdgpu.overdrive.enable = true;
   programs.corectrl.enable = true;
@@ -62,12 +58,6 @@
 
   # box is mostly for agent use and we want it to have full access, so ditch sudo passwords
   security.sudo.wheelNeedsPassword = false;
-
-  hardware.graphics = {
-    enable = true;
-    enable32Bit = true;
-    extraPackages = with pkgs; [ vulkan-tools ];
-  };
 
   # Ollama sizes the default context from available VRAM (4k/32k/256k tiers), and
   # on this 8GB card it lands on the bottom tier: 4096 tokens, regardless of the
@@ -100,7 +90,6 @@
 
   environment.systemPackages = with pkgs; [
     lact # control amdgpu
-    vulkan-tools # vulkaninfo for GPU debugging
   ];
   systemd.packages = with pkgs; [ lact ];
   systemd.services.lactd.wantedBy = ["multi-user.target"];
