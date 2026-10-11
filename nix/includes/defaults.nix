@@ -64,11 +64,8 @@ in
       allowUnfree = true;
       allowInsecurePredicate = pkg: builtins.elem (pkgs.lib.getName pkg) [
         "pulsar"
-        "electron"
-        "deskflow"
         "beekeeper-studio"
         "ventoy"
-        "mbedtls"
       ];
     };
 
