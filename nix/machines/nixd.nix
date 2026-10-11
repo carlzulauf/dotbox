@@ -54,8 +54,6 @@
   hardware.amdgpu.overdrive.enable = true;
   programs.corectrl.enable = true;
 
-  services.displayManager.gdm.autoSuspend = false;
-
   # box is mostly for agent use and we want it to have full access, so ditch sudo passwords
   security.sudo.wheelNeedsPassword = false;
 

@@ -6,7 +6,6 @@
     gnome-secrets eog gnome-boxes gnome-sound-recorder gnome-music
     gnome-firmware gnome-tweaks dconf-editor
     gnome-themes-extra
-    packagekit
 
     gnomeExtensions.appindicator
     gnomeExtensions.caffeine
@@ -96,21 +95,13 @@
   #  };
   #}];
 
-  services.qemuGuest.enable = true;
   virtualisation.libvirtd = {
     enable = true;
     qemu = {
       package = pkgs.qemu_kvm;
-      runAsRoot = true;
       swtpm.enable = true;
       vhostUserPackages = with pkgs; [ virtiofsd ];
     };
-  };
-
-  xdg.portal = {
-    enable = true;
-    extraPortals = [ pkgs.xdg-desktop-portal-gnome pkgs.xdg-desktop-portal-gtk ];
-    # config.common.default = "*";
   };
 
   /* disabled due to libpeas-2.0.1 build error (lua51 missing) */
