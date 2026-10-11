@@ -86,11 +86,8 @@
     };
   };
 
-  environment.systemPackages = with pkgs; [
-    lact # control amdgpu
-  ];
-  systemd.packages = with pkgs; [ lact ];
-  systemd.services.lactd.wantedBy = ["multi-user.target"];
+  # LACT to control amdgpu: installs the GUI and runs the lactd daemon
+  services.lact.enable = true;
 
   time.timeZone = "America/Chicago";
 }
