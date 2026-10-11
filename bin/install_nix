@@ -21,7 +21,7 @@
 #                               needed); HOST just has to have that user in its
 #                               nix.settings.trusted-users.
 #       --nax                   Shorthand for --build-host=nax
-#       --hostname              Specify machine to build (default: `hostname`)
+#       --hostname=NAME         Specify machine to build (default: `hostname`)
 #   -j, --jobs, --max-jobs=N    Limit nix to N concurrent build jobs
 #       --cores=N               Limit each build job to N cores
 #   -h, --help                  Show this help message
@@ -244,7 +244,7 @@ class Script
           parsed[:cores] = cores
         end
 
-        op.on("--hostname", "Specify which nix machine to build (defaults to current hostname).") do |name|
+        op.on("--hostname=NAME", "Specify which nix machine to build (defaults to current hostname).") do |name|
           parsed[:host] = name
         end
 
