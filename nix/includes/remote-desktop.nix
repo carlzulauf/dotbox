@@ -15,7 +15,7 @@
 #         between the display and a remote login, so GDM offers to kill the
 #         local one instead.
 #
-# `rdp <host>` picks between them: 3390 if it answers, otherwise 3389.
+# Clients connect with GNOME Connections, with each host:port added by hand.
 #
 # One-time setup per machine: put the RDP password (the secret for the RDP
 # connection itself, not an account password) in
@@ -62,57 +62,9 @@ let
       chmod 600 "${dir}/rdp-tls.key"
     fi
   '';
-
-  rdp = pkgs.writeShellApplication {
-    name = "rdp";
-    runtimeInputs = [ pkgs.bash pkgs.coreutils pkgs.gnome-connections ];
-    text = ''
-      usage() {
-        echo "usage: rdp [--live|--login] <host>" >&2
-        echo "  --live   share the session running on the host's display (port ${toString livePort})" >&2
-        echo "  --login  GNOME Remote Login into a fresh/resumed headless session (port ${toString loginPort})" >&2
-        exit 2
-      }
-
-      mode=auto
-      case "''${1:-}" in
-        --live) mode=live; shift ;;
-        --login) mode=login; shift ;;
-        -h|--help) usage ;;
-      esac
-      [ $# -eq 1 ] || usage
-      host=$1
-
-      # Offline tailnet peers swallow SYNs rather than refusing, so bound it.
-      port_open() { timeout 2 bash -c ": </dev/tcp/$host/$1" 2>/dev/null; }
-
-      case $mode in
-        live) port=${toString livePort} ;;
-        login) port=${toString loginPort} ;;
-        auto)
-          if port_open ${toString livePort}; then
-            port=${toString livePort}
-            echo "rdp: $host has a live session, sharing it (port $port)"
-          elif port_open ${toString loginPort}; then
-            port=${toString loginPort}
-            echo "rdp: no live session on $host, using Remote Login (port $port)"
-          else
-            echo "rdp: $host answers on neither ${toString livePort} nor ${toString loginPort}" >&2
-            exit 1
-          fi
-          ;;
-      esac
-
-      exec gnome-connections "rdp://$host:$port"
-    '';
-  };
 in
 {
   config = lib.mkMerge [
-    {
-      environment.systemPackages = [ rdp ];
-    }
-
     (lib.mkIf gnome {
       services.gnome.gnome-remote-desktop.enable = true;
 
