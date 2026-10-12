@@ -32,6 +32,8 @@
       # not much of a gaming device, but will be used to stream games.
       # gets steam, but doesn't need the full gaming.nix
       ../includes/steam.nix
+      # Synaptics 06cb:00e7 fingerprint sensor
+      ../pkgs/synaptics-00e7/module.nix
     ];
 
   environment.systemPackages = with pkgs; [
@@ -42,12 +44,6 @@
   ];
 
   services.fwupd.enable = true;
-
-  # Tried these, fingerprint sensor still doesn't work
-  #   services.fprintd.enable = true;
-  #   services.fprintd.tod.enable = true;
-  #   services.fprintd.tod.driver = pkgs.libfprint-2-tod1-goodix;
-  #   services.fprintd.tod.driver = pkgs.libfprint-2-tod1-elan;
 
   # programs.hyprland.enable = true;
   # programs.iio-hyprland.enable = true;
