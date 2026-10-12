@@ -37,6 +37,9 @@
     cores = 8;
   };
 
+  # allow nax to build ARM packages (for raspberry pi or pine64)
+  boot.binfmt.emulatedSystems = [ "aarch64-linux" ];
+
   # lsblk --output NAME,SIZE,TYPE,MOUNTPOINTS,UUID
   fileSystems."/mnt/ocean1" = {
     device = "/dev/disk/by-uuid/3a2123a9-49bf-4786-b815-84e191158c3e";
