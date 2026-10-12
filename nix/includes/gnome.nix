@@ -1,6 +1,9 @@
 { config, lib, pkgs, ... }:
 
 {
+  # RDP between machines over the tailnet
+  imports = [ ./remote-desktop-gnome.nix ];
+
   environment.systemPackages = with pkgs; [
     transmission_4-gtk
     gnome-secrets eog gnome-boxes gnome-sound-recorder gnome-music
@@ -42,6 +45,11 @@
       # a fixed resolution. Native scaling skips the upscale/downscale round trip.
       # Undocumented in the schema description but present in the flags enum.
       settings."org/gnome/mutter".experimental-features = [ "xwayland-native-scaling" ];
+
+      # GNOME hides Log Out for the only account with the only session, which
+      # leaves a headless Remote Login session (remote-desktop-gnome.nix) with
+      # no way out but Power Off -- and that takes the whole machine down.
+      settings."org/gnome/shell".always-show-log-out = true;
     }
   ];
 

@@ -12,6 +12,7 @@
       nixos-hardware.nixosModules.common-cpu-intel
       ../includes/gui.nix
       ../includes/printing.nix
+      ../includes/remote-desktop-plasma.nix
     ];
 
   # Enable the KDE Plasma Desktop Environment.
