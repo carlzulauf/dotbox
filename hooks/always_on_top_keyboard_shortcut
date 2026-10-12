@@ -4,7 +4,9 @@ require 'open3'
 
 class Script
   def call
-    if gsettings_installed?
+    if !gnome_installed?
+      print "Skipped, GNOME not detected"
+    elsif gsettings_installed?
       install_via_gsettings
     else
       print "Missing prerequisites"
@@ -18,8 +20,19 @@ class Script
     status.success?
   end
 
+  # Searches PATH directly; `which` isn't always installed.
+  def installed?(name)
+    ENV.fetch("PATH", "").split(File::PATH_SEPARATOR).any? do |dir|
+      File.executable?(File.join(dir, name))
+    end
+  end
+
+  def gnome_installed?
+    installed?("gnome-shell")
+  end
+
   def gsettings_installed?
-    run?("which gsettings")
+    installed?("gsettings")
   end
 
   def install_via_gsettings
