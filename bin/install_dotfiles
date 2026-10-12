@@ -86,6 +86,14 @@ class InstallDotfiles < Struct.new(:options)
       end
 
       parser.on(
+          "-y",
+          "--yes",
+          "Automatically approve changes (for non-interactive use)."
+      ) do
+        options[:yes] = true
+      end
+
+      parser.on(
           "-v",
           "--verbose",
           "Enable more verbose output."
@@ -103,6 +111,7 @@ class InstallDotfiles < Struct.new(:options)
       backup_dir: BACKUP_DIR,
       symlinks: true,
       verbose: false,
+      yes: false,
       private_dirs: [],
       run_hooks: true,
       hooks_dirs: []
@@ -355,6 +364,12 @@ class InstallDotfiles < Struct.new(:options)
   end
 
   def confirm_install
+    if options[:yes]
+      puts "Applying changes without confirmation (--yes)"
+      separator
+      return
+    end
+
     print "Are you sure you want to apply these changes (Yes/[No])? "
     answer = STDIN.gets.strip
     if answer !~ /^y(es)?$/i
