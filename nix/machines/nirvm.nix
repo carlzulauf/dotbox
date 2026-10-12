@@ -19,11 +19,11 @@
 # be logged into remotely. Reachable on the LAN (the VM has its own LAN
 # address via macvtap) and the tailnet. Credentials are carl and the same
 # password the RDP setup uses on the other machines,
-# ~/.config/remote-desktop/rdp-password from dotbox-private. Only encrypted
-# security types are offered: RSA-AES, and VeNCrypt with a self-signed
-# certificate. TigerVNC's vncviewer works (RSA-AES, accept the key
-# fingerprint on first connect). GNOME Connections does not: gtk-vnc has no
-# RSA-AES and fails VeNCrypt's certificate setup.
+# ~/.config/remote-desktop/rdp-password from dotbox-private. It uses classic
+# VNC password auth (libvncserver backend) with no encryption, which is fine
+# on the home LAN and the tailnet and is what GNOME Connections (gtk-vnc)
+# supports. Only the first 8 characters of the password count, and there is
+# no username.
 #
 # The libvirt console (virt-manager or virt-viewer over qemu+ssh://<host>)
 # stays available too, for when the guest itself is in trouble.
@@ -37,7 +37,6 @@ let
 
   vncPort = 5900;
   reframeInstance = "main";
-  reframeStateDir = "/var/lib/reframe";
   rdpPasswordFile = "${home}/.config/remote-desktop/rdp-password";
 in
 {
@@ -138,8 +137,7 @@ in
   };
 
   systemd.services.reframe-setup = {
-    description = "Write ReFrame's config and TLS/RSA keys";
-    path = [ pkgs.openssl ];
+    description = "Write ReFrame's config";
     serviceConfig = {
       Type = "oneshot";
       RemainAfterExit = true;
@@ -149,20 +147,6 @@ in
         echo "${rdpPasswordFile} is missing: not starting the VNC server" >&2
         exit 1
       fi
-
-      install -d -m 750 -o root -g reframe ${reframeStateDir}
-      cd ${reframeStateDir}
-
-      # Self-signed is fine: VNC clients pin the certificate on first connect.
-      if [ ! -s tls.key ] || [ ! -s tls.crt ]; then
-        openssl req -x509 -newkey rsa:4096 -nodes -days 3650 -sha256 \
-          -subj "/CN=${config.networking.hostName}" \
-          -keyout tls.key -out tls.crt 2>/dev/null
-      fi
-      # RSA-AES (RA2) needs a PKCS#1 key, the "traditional" format.
-      [ -s rsa.key ] || openssl genrsa -traditional -out rsa.key 4096 2>/dev/null
-      chown root:reframe tls.key tls.crt rsa.key
-      chmod 640 tls.key tls.crt rsa.key
 
       # Rewritten every boot so a changed password is picked up. The
       # [reframe] defaults find the first connected display on their own.
@@ -174,15 +158,8 @@ in
 
       [vnc]
       port=${toString vncPort}
-      backend=neatvnc
+      backend=libvncserver
       password=$(< ${rdpPasswordFile})
-
-      [neatvnc]
-      username=${user}
-      allow-broken-crypto=false
-      rsa-private-key-file=${reframeStateDir}/rsa.key
-      tls-private-key-file=${reframeStateDir}/tls.key
-      tls-certificate-file=${reframeStateDir}/tls.crt
       EOF
     '';
   };

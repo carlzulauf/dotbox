@@ -372,7 +372,7 @@ class Script
 
         #{NAME} is up at #{ips.join(', ')}.
           First boot provisioning runs before the greeter appears.
-          Remote desktop: VNC to #{ips.first}:5900 as carl, with the RDP password.
+          Remote desktop: VNC to #{ips.first}:5900 with the RDP password.
           Console: virt-manager, or virt-viewer -c qemu+ssh://#{`hostname`.strip}/system #{NAME}
           SSH: ssh carl@#{ips.first}  (from another machine; macvtap hides the guest from this host)
       MSG
