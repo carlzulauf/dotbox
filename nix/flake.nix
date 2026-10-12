@@ -45,6 +45,7 @@
       "khoa" # torrent station
       "nax"  # NAS
       "nixd" # Custom Desktop
+      "nirvm" # niri VM (libvirt guest, see bin/nirvm)
       "obak" # Offsite Backup
       "phx"  # GPD WinMax
       "xps"  # Work XPS

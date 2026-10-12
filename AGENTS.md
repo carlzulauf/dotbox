@@ -4,7 +4,7 @@ Provides a guide to agents or others for working in this repo.
 
 ## Repo Organization
 
-* bin/ - Contains nix installer and dotfiles installer.
+* bin/ - Contains nix installer, dotfiles installer, and `nirvm` (creates the niri VM).
 * nix/ - Contains base NixOS configuration
 * nix/includes - Contains reusable nix modules that are included in machine configs
 * nix/machines - Contains per-physical-machine configs for user's NixOS systems

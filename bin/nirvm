@@ -1,0 +1,411 @@
+#!/usr/bin/env ruby
+
+# === nirvm: create the niri VM on this host ===
+# Builds nirvm's disk image from the flake (nix/machines/nirvm.nix), imports
+# it into libvirt, and boots it with a seed disk the guest provisions itself
+# from on first boot: the account password, copies of the dotbox,
+# dotbox-private and scratch repos (dotfiles get installed from them), and
+# optionally a tailscale auth key.
+#
+# Usage (from dotbox dir):
+#   bin/nirvm [options] create
+#   bin/nirvm [options] destroy
+#
+# Options:
+#       --memory=MIB            Guest RAM in MiB (default 8192)
+#       --cpus=N                Guest vCPUs (default 4)
+#       --disk=GIB              Disk size in GiB (default 64)
+#       --lan-dev=DEV           Host NIC the guest joins the LAN through, by
+#                               macvtap (default: the default route's NIC)
+#       --network=NAME          Use this libvirt network instead of macvtap
+#                               (macvtap doesn't work over wifi)
+#       --password-file=FILE    carl's password in the guest (default: prompt)
+#       --tailscale-authkey-file=FILE
+#                               Join the tailnet on first boot
+#       --image=PATH            Use this qcow2 instead of building one
+#       --no-start              Define the VM, but don't boot it
+#   -y, --yes                   Don't ask before destroying
+#   -h, --help                  Show this help message
+#
+# The VM:
+#   - Has its own LAN address (macvtap bridge mode). The host itself can't
+#     reach a macvtap guest over the LAN, only over the tailnet; that's a
+#     macvtap limitation.
+#   - Renders through virgl on the host GPU (niri needs GL), with the frames
+#     read back by egl-headless for the VNC console. (A SPICE console stays
+#     black with egl-headless, and `virsh screenshot` fails with "no surface"
+#     either way.) The console listens on the host's localhost only: open it
+#     with virt-manager, or `virt-viewer -c qemu+ssh://<host>/system nirvm`
+#     from another machine.
+#   - Serves its own remote desktop, VNC on 5900 (see nix/machines/nirvm.nix).
+#
+# Repos are cloned from their checkouts next to this one (../dotbox-private,
+# ../scratch), at their current branch, with origin pointed back upstream.
+# Only committed work is copied. dotbox is cloned from this checkout, so a
+# worktree on a branch puts that branch in the VM.
+#
+# Requirements:
+#   - ruby, git, nix (flakes)
+#   - libvirtd, with the current user in the libvirtd group
+#   - mkisofs (cdrtools) and mkpasswd (whois), both in includes/defaults.nix
+#   - a GPU render node (/dev/dri/renderD*)
+
+require 'fileutils'
+require 'io/console'
+require 'json'
+require 'open3'
+require 'optparse'
+require 'tmpdir'
+
+class Script
+  NAME = "nirvm"
+  POOL = "default"
+  DISK_VOLUME = "#{NAME}.qcow2"
+  SEED_VOLUME = "#{NAME}-seed.iso"
+  # must match seedLabel in nix/machines/nirvm.nix
+  SEED_LABEL = "NIRVM-SEED"
+  REPOS = %w[dotbox dotbox-private scratch]
+
+  def self.default_options
+    {
+      command:          nil,
+      connect:          "qemu:///system",
+      memory:           8192,
+      cpus:             4,
+      disk:             64,
+      lan_dev:          nil,
+      network:          nil,
+      password_file:    nil,
+      tailscale_authkey_file: nil,
+      image:            nil,
+      start:            true,
+      yes:              false,
+    }
+  end
+
+  def self.dotbox_dir
+    File.expand_path(File.join(File.dirname(__FILE__), ".."))
+  end
+
+  def self.start(argv)
+    new(argv).()
+  end
+
+  attr_reader :options
+
+  def initialize(argv)
+    @options = self.class.default_options.merge(parse_options(argv))
+  end
+
+  def call
+    case options[:command]
+    when "create" then create
+    when "destroy" then destroy
+    else
+      abort "Usage: bin/nirvm [options] create|destroy (see --help)"
+    end
+  end
+
+  def create
+    abort "#{NAME} already exists; `bin/nirvm destroy` it first." if domain_exists?
+    render_node # fail before the long build, not after
+    nic = interface_xml
+    password_hash = read_password_hash
+
+    image = options[:image] || build_image
+
+    Dir.mktmpdir("nirvm-seed") do |tmp|
+      iso = File.join(tmp, SEED_VOLUME)
+      build_seed(File.join(tmp, "seed"), iso, password_hash)
+      upload_volume(SEED_VOLUME, iso, "raw")
+    end
+    upload_volume(DISK_VOLUME, image, "qcow2")
+    virsh "vol-resize", "--pool", POOL, DISK_VOLUME, "#{options[:disk]}G"
+
+    Dir.mktmpdir("nirvm-domain") do |tmp|
+      xml = File.join(tmp, "#{NAME}.xml")
+      File.write(xml, domain_xml(nic))
+      virsh "define", xml
+    end
+    virsh "autostart", NAME
+
+    return puts("Defined #{NAME}; start it with `virsh -c #{connect} start #{NAME}`.") unless options[:start]
+
+    virsh "start", NAME
+    report_address
+  end
+
+  def destroy
+    abort "#{NAME} doesn't exist." unless domain_exists?
+    unless options[:yes]
+      print "Destroy #{NAME} and delete its disk? [y/N] "
+      abort "Not destroyed." unless $stdin.gets.to_s.strip.downcase.start_with?("y")
+    end
+    virsh "destroy", NAME if domain_running?
+    virsh "undefine", NAME, "--nvram", "--remove-all-storage"
+    # cdrom volumes aren't always counted as the domain's storage
+    virsh "vol-delete", "--pool", POOL, SEED_VOLUME if volume_exists?(SEED_VOLUME)
+  end
+
+  private
+
+  def connect
+    options[:connect]
+  end
+
+  def run(*cmd)
+    puts " + #{cmd.join(' ')}"
+    system(*cmd) or abort "Command failed: #{cmd.join(' ')}"
+  end
+
+  def capture(*cmd, **opts)
+    out, status = Open3.capture2(*cmd, **opts)
+    status.success? ? out.strip : nil
+  end
+
+  def virsh(*args)
+    run "virsh", "--connect", connect, *args
+  end
+
+  def virsh_ok?(*args)
+    system("virsh", "--connect", connect, *args, out: File::NULL, err: File::NULL)
+  end
+
+  def domain_exists?
+    virsh_ok?("dominfo", NAME)
+  end
+
+  def domain_running?
+    capture("virsh", "--connect", connect, "domstate", NAME) == "running"
+  end
+
+  def volume_exists?(volume)
+    virsh_ok?("vol-info", "--pool", POOL, volume)
+  end
+
+  def build_image
+    flake = File.join(self.class.dotbox_dir, "nix")
+    out = capture(
+      "nix", "build", "--no-link", "--print-out-paths",
+      "#{flake}#nixosConfigurations.#{NAME}.config.system.build.image"
+    ) or abort "Building the #{NAME} image failed (new files have to be `git add`ed for the flake to see them)."
+    Dir.glob(File.join(out, "*.qcow2")).first or abort "No qcow2 in #{out}"
+  end
+
+  # --- seed disk ---
+
+  def read_password_hash
+    password =
+      if options[:password_file]
+        File.read(options[:password_file]).chomp
+      else
+        first = prompt_secret("Password for carl in #{NAME}: ")
+        abort "Passwords don't match." unless first == prompt_secret("Again: ")
+        first
+      end
+    abort "Empty password." if password.empty?
+
+    hash, status = Open3.capture2("mkpasswd", "--method=yescrypt", "--stdin", stdin_data: password)
+    abort "mkpasswd failed" unless status.success?
+    hash.strip
+  end
+
+  def prompt_secret(prompt)
+    print prompt
+    $stdin.noecho(&:gets).to_s.chomp.tap { puts }
+  end
+
+  def build_seed(dir, iso, password_hash)
+    repos = File.join(dir, "repos")
+    FileUtils.mkdir_p(repos)
+    File.write(File.join(dir, "password.hash"), "#{password_hash}\n")
+    if options[:tailscale_authkey_file]
+      FileUtils.cp(options[:tailscale_authkey_file], File.join(dir, "tailscale-authkey"))
+    end
+
+    REPOS.each do |name|
+      src = repo_source(name)
+      next warn("Skipping #{name}: no checkout at #{src}") unless File.exist?(File.join(src, ".git"))
+      clone_repo(src, File.join(repos, name))
+    end
+
+    run "mkisofs", "-quiet", "-R", "-V", SEED_LABEL, "-o", iso, dir
+  end
+
+  # dotbox comes from this checkout; the rest from beside it.
+  def repo_source(name)
+    return self.class.dotbox_dir if name == "dotbox"
+    File.expand_path(File.join(self.class.dotbox_dir, "..", name))
+  end
+
+  def clone_repo(src, dest)
+    branch = capture("git", "-C", src, "branch", "--show-current")
+    upstream = capture("git", "-C", src, "remote", "get-url", "origin")
+    unless capture("git", "-C", src, "status", "--porcelain").to_s.empty?
+      warn "#{src} has uncommitted changes; only commits are copied."
+    end
+
+    run "git", "clone", "--quiet", "--no-hardlinks",
+      *(branch.to_s.empty? ? [] : ["--branch", branch]), src, dest
+    run "git", "-C", dest, "remote", "set-url", "origin", upstream if upstream
+  end
+
+  # --- libvirt ---
+
+  # A volume is created in the pool and filled over libvirt's stream, so this
+  # needs no root: libvirtd owns the files under the pool directory.
+  def upload_volume(volume, file, format)
+    virsh "vol-delete", "--pool", POOL, volume if volume_exists?(volume)
+    virsh "vol-create-as", POOL, volume, File.size(file).to_s, "--format", format
+    virsh "vol-upload", "--pool", POOL, volume, file
+    virsh "pool-refresh", POOL
+  end
+
+  def render_node
+    @render_node ||= Dir.glob("/dev/dri/renderD*").sort.first or
+      abort "No GPU render node in /dev/dri; niri can't run without GL."
+  end
+
+  def interface_xml
+    if options[:network]
+      return <<~XML
+        <interface type='network'>
+          <source network='#{options[:network]}'/>
+          <model type='virtio'/>
+        </interface>
+      XML
+    end
+
+    dev = options[:lan_dev] || default_route_dev or
+      abort "Couldn't find the default route's NIC; pass --lan-dev or --network."
+    if File.exist?("/sys/class/net/#{dev}/wireless")
+      abort "#{dev} is wifi, which macvtap can't bridge onto; pass --network (e.g. --network=default) instead."
+    end
+    <<~XML
+      <interface type='direct'>
+        <source dev='#{dev}' mode='bridge'/>
+        <model type='virtio'/>
+      </interface>
+    XML
+  end
+
+  def default_route_dev
+    routes = JSON.parse(capture("ip", "-json", "route", "show", "default") || "[]")
+    routes.first&.fetch("dev", nil)
+  end
+
+  def domain_xml(nic)
+    <<~XML
+      <domain type='kvm'>
+        <name>#{NAME}</name>
+        <metadata>
+          <libosinfo:libosinfo xmlns:libosinfo="http://libosinfo.org/xmlns/libvirt/domain/1.0">
+            <libosinfo:os id="http://nixos.org/nixos/unstable"/>
+          </libosinfo:libosinfo>
+        </metadata>
+        <memory unit='MiB'>#{options[:memory]}</memory>
+        <vcpu>#{options[:cpus]}</vcpu>
+        <os firmware='efi'>
+          <type arch='x86_64' machine='q35'>hvm</type>
+          <firmware>
+            <feature enabled='no' name='secure-boot'/>
+          </firmware>
+          <boot dev='hd'/>
+        </os>
+        <features>
+          <acpi/>
+          <apic/>
+        </features>
+        <cpu mode='host-passthrough'/>
+        <clock offset='utc'/>
+        <devices>
+          <disk type='volume' device='disk'>
+            <driver name='qemu' type='qcow2' discard='unmap'/>
+            <source pool='#{POOL}' volume='#{DISK_VOLUME}'/>
+            <target dev='vda' bus='virtio'/>
+          </disk>
+          <disk type='volume' device='cdrom'>
+            <driver name='qemu' type='raw'/>
+            <source pool='#{POOL}' volume='#{SEED_VOLUME}'/>
+            <target dev='sda' bus='sata'/>
+            <readonly/>
+          </disk>
+          #{nic.strip.gsub("\n", "\n    ")}
+          <channel type='unix'>
+            <target type='virtio' name='org.qemu.guest_agent.0'/>
+          </channel>
+          <input type='tablet' bus='virtio'/>
+          <input type='keyboard' bus='virtio'/>
+          <graphics type='vnc' autoport='yes'>
+            <listen type='address' address='127.0.0.1'/>
+          </graphics>
+          <graphics type='egl-headless'>
+            <gl rendernode='#{render_node}'/>
+          </graphics>
+          <video>
+            <model type='virtio' heads='1' primary='yes'>
+              <acceleration accel3d='yes'/>
+              <resolution x='1920' y='1080'/>
+            </model>
+          </video>
+          <audio id='1' type='none'/>
+          <rng model='virtio'>
+            <backend model='random'>/dev/urandom</backend>
+          </rng>
+          <memballoon model='virtio'/>
+        </devices>
+      </domain>
+    XML
+  end
+
+  # The guest agent starts a little after boot; first boot provisioning then
+  # runs before the greeter, so the address shows up first.
+  def report_address
+    puts "Waiting for #{NAME} to report its address..."
+    60.times do
+      sleep 5
+      addrs = capture("virsh", "--connect", connect, "domifaddr", NAME, "--source", "agent", err: File::NULL)
+      ips = addrs.to_s.scan(%r{ipv4\s+([\d.]+)/}).flatten.reject { |ip| ip.start_with?("127.") }
+      next if ips.empty?
+
+      puts <<~MSG
+
+        #{NAME} is up at #{ips.join(', ')}.
+          First boot provisioning runs before the greeter appears.
+          Remote desktop: VNC to #{ips.first}:5900 as carl, with the RDP password.
+          Console: virt-manager, or virt-viewer -c qemu+ssh://#{`hostname`.strip}/system #{NAME}
+          SSH: ssh carl@#{ips.first}  (from another machine; macvtap hides the guest from this host)
+      MSG
+      return
+    end
+    puts "#{NAME} hasn't reported an address yet; check the console."
+  end
+
+  def parse_options(argv)
+    {}.tap do |parsed|
+      remainders = OptionParser.new do |op|
+        op.banner = "Usage: bin/nirvm [options] create|destroy"
+
+        op.on("--memory=MIB", Integer, "Guest RAM in MiB (default 8192)") { |v| parsed[:memory] = v }
+        op.on("--cpus=N", Integer, "Guest vCPUs (default 4)") { |v| parsed[:cpus] = v }
+        op.on("--disk=GIB", Integer, "Disk size in GiB (default 64)") { |v| parsed[:disk] = v }
+        op.on("--lan-dev=DEV", "Host NIC to join the LAN through by macvtap (default: default route's)") { |v| parsed[:lan_dev] = v }
+        op.on("--network=NAME", "Use this libvirt network instead of macvtap") { |v| parsed[:network] = v }
+        op.on("--password-file=FILE", "carl's password in the guest (default: prompt)") { |v| parsed[:password_file] = v }
+        op.on("--tailscale-authkey-file=FILE", "Join the tailnet on first boot") { |v| parsed[:tailscale_authkey_file] = v }
+        op.on("--image=PATH", "Use this qcow2 instead of building one") { |v| parsed[:image] = v }
+        op.on("--no-start", "Define the VM, but don't boot it") { parsed[:start] = false }
+        op.on("--connect=URI", "libvirt URI (default qemu:///system)") { |v| parsed[:connect] = v }
+        op.on("-y", "--yes", "Don't ask before destroying") { parsed[:yes] = true }
+        op.on("-h", "--help") do
+          puts op
+          exit
+        end
+      end.parse(argv)
+      command = remainders.first
+      parsed[:command] = command unless command.nil? || command.empty?
+    end
+  end
+end
+
+Script.start(ARGV)

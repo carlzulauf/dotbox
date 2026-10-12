@@ -14,6 +14,7 @@ This repository manages infrastructure for multiple NixOS systems (desktops, lap
     *   `carl.nix`: User account setup and service credentials (Syncthing, etc.).
     *   `dev.nix`, `gui.nix`, `gnome.nix`, `ai.nix`, `gaming.nix`, `steam.nix`, `tv.nix`: Feature sets for different usage profiles.
     *   `remote-desktop-gnome.nix` (imported by `gnome.nix`) and `remote-desktop-plasma.nix` (imported by khoa): RDP over the tailnet. Port 3390 shares the live session, 3389 is GNOME Remote Login.
+    *   `niri-dms.nix`: Standalone niri desktop riced with DankMaterialShell (bar, launcher, notifications, lock, theming) and its greetd greeter. Used by nirvm.
 
 ### The Installer (`bin/install_nix`)
 The script `bin/install_nix` automates the deployment process:
@@ -34,6 +35,7 @@ The `flake.nix` defines the following active systems:
 | **khoa** | Torrent Station | |
 | **nax** | NAS & Remote Builder | Used as a build host for faster derivation evaluation on larger machines. |
 | **nixd** | Custom Desktop | |
+| **nirvm** | niri VM (libvirt guest on frix) | niri + DankMaterialShell; created with `bin/nirvm create`, hand-written `hardware/nirvm.nix` also builds its disk image; VNC on 5900 via ReFrame. |
 | **obak** | Offsite Backup Server | |
 | **phx** | GPD WinMax (Handheld PC) | |
 | **xps** | Work XPS Laptop | |
