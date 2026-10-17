@@ -132,6 +132,7 @@ in
       ../includes/printing.nix
       ../includes/steam.nix
       ../includes/t3code.nix
+      ../includes/dictation.nix
     ];
 
   environment.systemPackages = with pkgs; [
@@ -182,6 +183,18 @@ in
   };
 
   services.fwupd.enable = true;
+
+  # Super+Q dictates with Cohere Transcribe (CPU), Super+Shift+Q with Whisper
+  # large-v3-turbo (GPU). Swap engine and alternateEngine to swap the keys.
+  dotbox.dictation = {
+    vulkan = true;
+    models = {
+      cohere = "cohere-transcribe-q4f16";
+      whisper = "large-v3-turbo";
+    };
+    engine = "cohere";
+    alternateEngine = "whisper";
+  };
 
   services.ollama = {
     package = ollamaSwitcher;

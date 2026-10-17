@@ -11,6 +11,7 @@
     ../includes/gaming.nix
     ../includes/gnome.nix
     ../includes/printing.nix
+    ../includes/dictation.nix # Parakeet on the CPU
     # ../pkgs/ipu7-camera/module.nix
   ];
 

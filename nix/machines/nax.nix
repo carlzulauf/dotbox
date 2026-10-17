@@ -34,6 +34,19 @@
   environment.systemPackages = with pkgs; [
     nvtopPackages.amd
     file # signal-decode-v2 identifies decrypted attachments with it
+
+    # Transcribe old recordings: `transcribe a.m4a b.wav ...` writes .txt,
+    # .srt, .vtt, .tsv and .json for each into the current directory. Any
+    # whisperx option after the files overrides these defaults (last one
+    # wins), e.g. --language es, --output_format txt, or speaker labels with
+    # --diarize --hf_token <token>. CPU only, so slow but accurate: large-v3,
+    # int8, 8 of the 16 threads, niced so jellyfin keeps priority.
+    whisperx
+    (writeShellScriptBin "transcribe" ''
+      exec nice -n 10 ${whisperx}/bin/whisperx \
+        --model large-v3 --device cpu --compute_type int8 --threads 8 \
+        --language en --output_format all "$@"
+    '')
   ];
 
   # nix.settings.substituters = [ "http://nax/" ];

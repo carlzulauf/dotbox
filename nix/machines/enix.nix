@@ -27,6 +27,7 @@
       nixos-hardware.nixosModules.common-gpu-amd
       ../includes/gui.nix
       ../includes/printing.nix
+      ../includes/dictation.nix # Parakeet on the CPU
       ../includes/gnome.nix
       ../includes/gnome-cosmic.nix
       # not much of a gaming device, but will be used to stream games.
