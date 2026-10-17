@@ -57,7 +57,9 @@ let
 
   # Same runtime environment as upstream's wrapped ONNX packages, plus the
   # pinned config path. onnxruntime is the one the build linked against
-  # (voxtype's nixpkgs follows ours).
+  # (voxtype's nixpkgs follows ours). The user services' PATH has little more
+  # than coreutils, so it also gets curl (model downloads) and which (output
+  # drivers are only used when `which <driver>` finds them).
   package = pkgs.symlinkJoin {
     name = "voxtype-${unwrapped.version}";
     paths = [ unwrapped ];
@@ -66,7 +68,7 @@ let
       wrapProgram $out/bin/voxtype \
         --add-flags "--config ${configPath}" \
         --prefix PATH : ${lib.makeBinPath (with pkgs; [
-          dotool wtype wl-clipboard libnotify pciutils
+          dotool wtype wl-clipboard libnotify pciutils curl which
         ])} \
         --set ORT_DYLIB_PATH "${pkgs.onnxruntime}/lib/libonnxruntime.so" \
         --prefix LD_LIBRARY_PATH : "${pkgs.onnxruntime}/lib"
