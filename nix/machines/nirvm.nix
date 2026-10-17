@@ -38,6 +38,105 @@ let
   vncPort = 5900;
   reframeInstance = "main";
   rdpPasswordFile = "${home}/.config/remote-desktop/rdp-password";
+
+  # Every cursor in this theme is a single transparent pixel.
+  invisibleCursorThemeName = "nirvm-invisible";
+  invisibleCursorTheme = pkgs.runCommand "nirvm-invisible-cursor-theme"
+    {
+      nativeBuildInputs = [ pkgs.xcursorgen pkgs.imagemagick ];
+      # CSS names (what cursor-shape-v1 asks for) plus the legacy X names.
+      names = ''
+        default context-menu help pointer progress wait cell crosshair text
+        vertical-text alias copy move no-drop not-allowed grab grabbing
+        all-scroll col-resize row-resize n-resize e-resize s-resize w-resize
+        ne-resize nw-resize se-resize sw-resize ew-resize ns-resize nesw-resize
+        nwse-resize zoom-in zoom-out dnd-ask dnd-none dnd-copy dnd-move dnd-link
+        left_ptr arrow top_left_arrow xterm ibeam hand1 hand2 watch
+        left_ptr_watch question_arrow crossed_circle pirate fleur size_all
+        sb_h_double_arrow sb_v_double_arrow size_hor size_ver size_bdiag
+        size_fdiag split_h split_v top_side bottom_side left_side right_side
+        top_left_corner top_right_corner bottom_left_corner bottom_right_corner
+        plus cross X_cursor openhand closedhand
+      '';
+    } ''
+    dir=$out/share/icons/${invisibleCursorThemeName}
+    mkdir -p $dir/cursors
+    magick -size 1x1 xc:none empty.png
+    echo "1 0 0 empty.png" > empty.cfg
+    xcursorgen empty.cfg $dir/cursors/left_ptr
+    for name in $names; do
+      [ -e $dir/cursors/$name ] || ln -s left_ptr $dir/cursors/$name
+    done
+    printf '[Icon Theme]\nName=${invisibleCursorThemeName}\n' > $dir/index.theme
+  '';
+
+  # Switches niri between the invisible theme and whatever cursor it had
+  # before, by rewriting a file that config.kdl includes last. niri reloads
+  # it on change.
+  nirvmCursor = pkgs.writeShellApplication {
+    name = "nirvm-cursor";
+    runtimeInputs = [ pkgs.coreutils pkgs.gnugrep ];
+    text = ''
+      niri_dir=''${XDG_CONFIG_HOME:-$HOME/.config}/niri
+      config=$niri_dir/config.kdl
+      cursor_file=$niri_dir/nirvm-cursor.kdl
+      include='include optional=true "nirvm-cursor.kdl"'
+      theme=${invisibleCursorThemeName}
+
+      usage() {
+        echo "usage: nirvm-cursor [toggle|hide|show|status|init]"
+        echo "Hides niri's cursor for remote desktop (VNC draws its own) or shows it"
+        echo "again for the libvirt console. Mod+Shift+C toggles it too."
+      }
+
+      state() {
+        if grep -qF "xcursor-theme \"$theme\"" "$cursor_file" 2>/dev/null; then
+          echo hidden
+        else
+          echo shown
+        fi
+      }
+
+      write() {
+        {
+          echo "// Written by nirvm-cursor (see nix/machines/nirvm.nix); edits are lost."
+          echo "binds {"
+          echo "    Mod+Shift+C hotkey-overlay-title=\"Toggle cursor (hide for VNC)\" { spawn \"nirvm-cursor\" \"toggle\"; }"
+          echo "}"
+          if [ "$1" = hidden ]; then
+            echo "cursor {"
+            echo "    xcursor-theme \"$theme\""
+            echo "}"
+          fi
+        } > "$cursor_file.tmp"
+        mv "$cursor_file.tmp" "$cursor_file"
+      }
+
+      # Hooks the file into niri's config (last, so it overrides DMS's
+      # cursor settings) and creates it shown, if either is missing.
+      init() {
+        [ -e "$config" ] || { echo "$config doesn't exist yet" >&2; exit 1; }
+        if ! grep -qxF "$include" "$config"; then
+          printf '\n// Cursor toggle for remote desktop, see nirvm-cursor\n%s\n' "$include" >> "$config"
+        fi
+        [ -e "$cursor_file" ] || write shown
+      }
+
+      case "''${1:-toggle}" in
+        init) init ;;
+        hide) init; write hidden; state ;;
+        show) init; write shown; state ;;
+        toggle)
+          init
+          if [ "$(state)" = hidden ]; then write shown; else write hidden; fi
+          state
+          ;;
+        status) state ;;
+        -h|--help|help) usage ;;
+        *) usage >&2; exit 2 ;;
+      esac
+    '';
+  };
 in
 {
   networking.hostName = "nirvm";
@@ -54,6 +153,10 @@ in
 
   # same as frix, its host
   time.timeZone = "America/Chicago";
+
+  # A throwaway test box that agents drive over ssh, so no sudo passwords
+  # (carl is the only wheel user).
+  security.sudo.wheelNeedsPassword = false;
 
   # --- First boot provisioning ---
 
@@ -162,6 +265,28 @@ in
       password=$(< ${rdpPasswordFile})
       EOF
     '';
+  };
+
+  # ReFrame can only paint niri's cursor into the frames it sends, where it
+  # trails the VNC client's own pointer as a second cursor. And niri draws
+  # the cursor into the picture itself on virtio-gpu (Smithay doesn't set
+  # the hotspot cap that unlocks the cursor plane on virtual GPUs), so
+  # ReFrame's cursor=false can't drop it. Instead `nirvm-cursor hide` (or
+  # Mod+Shift+C) makes niri's cursor invisible while using VNC, leaving
+  # only the client's pointer, which never changes shape. `nirvm-cursor
+  # show` brings it back for the libvirt console, where it's needed.
+  # Apps that draw their own cursor (some X11 ones) still show theirs.
+  environment.systemPackages = [ nirvmCursor invisibleCursorTheme ];
+
+  systemd.user.services.nirvm-cursor-init = {
+    description = "Hook nirvm-cursor's file into niri's config";
+    wantedBy = [ "niri.service" ];
+    before = [ "niri.service" ];
+    after = [ "niri-dms-config.service" ];
+    serviceConfig = {
+      Type = "oneshot";
+      ExecStart = "${nirvmCursor}/bin/nirvm-cursor init";
+    };
   };
 
   # Open to the LAN as well as the tailnet (trusted everywhere already).
