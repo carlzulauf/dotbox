@@ -32,7 +32,9 @@
     "plaintext": true,
     "git-commit": true
   },
-  "cSpell.userWords": [],
+  "cSpell.userWords": [
+    "automations"
+  ],
   "[ruby]": {
     // turn off when doing merge conflicts to avoid unrelated changes
     "editor.formatOnSave": true,
