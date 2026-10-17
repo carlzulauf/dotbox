@@ -21,6 +21,12 @@
     # Nix flake for DwarfStar, model runner for DeepSeek V4 Flash/Pro
     ds4.url = "github:carlzulauf/ds4.nix";
     ds4.inputs.nixpkgs.follows = "nixpkgs";
+
+    # Voxtype: local speech-to-text dictation (see includes/dictation.nix).
+    #  nixpkgs packages it too, but without the ONNX engines (Cohere, Parakeet)
+    voxtype.url = "github:peteonrails/voxtype";
+    voxtype.inputs.nixpkgs.follows = "nixpkgs";
+    voxtype.inputs.flake-utils.follows = "ds4/flake-utils";
   };
 
   outputs = {
