@@ -9,6 +9,8 @@ alias dcr='docker-compose run --rm -it'
 alias lsfs="dysk -a -f 'type=btrfs|type=ext4|type=merger|type=vfat|type=f2fs|type=ntfs'"
 alias fsls=lsfs
 
+alias ggs='git-global-status'
+
 # Replace ls with eza if available
 if type -q eza
   alias l='eza -a --color=always --group-directories-first --icons=auto'   # short, everything
