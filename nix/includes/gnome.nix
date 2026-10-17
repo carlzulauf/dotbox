@@ -15,7 +15,9 @@
     gnomeExtensions.desktop-cube
     gnomeExtensions.freon
     gnomeExtensions.screen-rotate
-    gnomeExtensions.clipboard-history
+    # not clipboard-history: it crashes gnome-shell when the lock screen
+    # toggles it mid-load (SUPERCILEX/gnome-clipboard-history#180)
+    gnomeExtensions.clipboard-indicator
     gnomeExtensions.paperwm
 
     gparted resources
