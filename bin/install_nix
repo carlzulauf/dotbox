@@ -77,28 +77,55 @@ class Script
     new(argv).()
   end
 
+  # A command to run, with an optional message printed once it succeeds.
+  Command = Struct.new(:argv, :sudo, :notice) do
+    def to_a
+      sudo ? ["sudo", *argv] : argv
+    end
+
+    def to_s
+      to_a.join(" ")
+    end
+  end
+
   attr_reader :options, :file_map
 
   def initialize(argv)
     @options = self.class.default_options.merge(parse_options(argv))
   end
 
+  # Every command is planned before any of them run, so the whole list can be
+  # shown up front. Nothing a later step checks is changed by an earlier one.
   def call
+    commands = [
+      sync_hardware_config,
+      copy_nix_files,
+      nixos_rebuild,
+      collect_garbage
+    ].reduce(:+)
+    print_plan(commands)
     keep_sudo_alive if use_sudo
-    sync_hardware_config
-    copy_nix_files
-    nixos_rebuild
-    collect_garbage
+    commands.each { |command| run(command) }
+    print_manual_steps unless rebuild
   end
 
-  def run(*cmd, sudo: false)
-    cmd.prepend("sudo") if sudo
-    puts " + #{cmd.join(' ')}"
-    status = system(*cmd)
+  def command(*argv, sudo: false, notice: nil)
+    Command.new(argv, sudo, notice)
+  end
+
+  def print_plan(commands)
+    puts "Commands to run:"
+    commands.each { |command| puts " $ #{command}" }
+    puts
+  end
+
+  def run(command)
+    status = system(*command.to_a)
     unless status
-      puts "Command failed: #{cmd}"
+      puts "Command failed: #{command.to_a}"
       exit 1
     end
+    puts command.notice if command.notice
   end
 
   # Prompt for sudo once up front (or not at all if the ticket is still fresh),
@@ -106,7 +133,7 @@ class Script
   # -- notably nixos-rebuild's activation after a long build -- never re-prompt.
   # `sudo -n -v` never prompts; it just extends the existing ticket.
   def keep_sudo_alive
-    run "sudo", "--validate"
+    run command("--validate", sudo: true)
 
     Thread.new do
       loop do
@@ -123,19 +150,23 @@ class Script
   # Only done for the machine being installed on, and never for generic, which
   # is installed on whatever hardware is at hand.
   def sync_hardware_config
-    return if host != self.class.default_host || host == "generic"
+    return [] if host != self.class.default_host || host == "generic"
 
     installed = File.join(install_path, "hardware-configuration.nix")
     tracked = File.join(config_dir, "hardware", "#{host}.nix")
 
     if File.exist?(installed)
-      return if File.exist?(tracked) && FileUtils.compare_file(installed, tracked)
+      return [] if File.exist?(tracked) && FileUtils.compare_file(installed, tracked)
 
-      FileUtils.mkdir_p(File.dirname(tracked))
-      run "cp", installed, tracked
-      puts "Updated #{tracked} from #{installed}; commit it to the repo."
+      tracked_dir = File.dirname(tracked)
+      [
+        *(File.directory?(tracked_dir) ? [] : [command("mkdir", "-p", tracked_dir)]),
+        command("cp", installed, tracked, notice: "Updated #{tracked} from #{installed}; commit it to the repo."),
+      ]
     elsif File.exist?(tracked)
-      run "cp", tracked, installed, sudo: use_sudo
+      [command("cp", tracked, installed, sudo: use_sudo)]
+    else
+      []
     end
   end
 
@@ -144,14 +175,16 @@ class Script
   # hardware-configuration.nix is generated on each machine and isn't in nix/,
   # so it is excluded to keep --delete from removing it.
   def copy_nix_files
-    run(
-      "rsync", "--archive", "--delete",
-      "--exclude=/hardware-configuration.nix",
-      *(use_sudo ? ["--chown=root:root"] : []),
-      "#{config_dir}/",
-      "#{install_path}/",
-      sudo: use_sudo
-    )
+    [
+      command(
+        "rsync", "--archive", "--delete",
+        "--exclude=/hardware-configuration.nix",
+        *(use_sudo ? ["--chown=root:root"] : []),
+        "#{config_dir}/",
+        "#{install_path}/",
+        sudo: use_sudo
+      )
+    ]
   end
 
   # `sudo nixos-rebuild` causes --build-host to ssh as root, which means /root
@@ -169,33 +202,41 @@ class Script
   end
 
   def nixos_rebuild
-    # An update that isn't built would never be copied back to the repo, and
-    # the next install would overwrite it, so it only runs with a rebuild.
-    if upgrade && rebuild
-      run "nix", "flake", "update", "--flake", install_path, sudo: use_sudo
-    end
+    return [] unless rebuild
 
+    [
+      # An update that isn't built would never be copied back to the repo, and
+      # the next install would overwrite it, so it only runs with a rebuild.
+      *(upgrade ? [flake_update_command] : []),
+      rebuild_command,
+      # capture the successful lock file if we get this far
+      copy_lock_file,
+    ]
+  end
+
+  def flake_update_command
+    command("nix", "flake", "update", "--flake", install_path, sudo: use_sudo)
+  end
+
+  def rebuild_command
     cmd_options = ["--log-format", "bar-with-logs", "--flake", "/etc/nixos##{host}"]
     cmd_options << "--build-host" << build_host if build_host
     cmd_options << "--max-jobs" << max_jobs.to_s if max_jobs
     cmd_options << "--cores" << cores.to_s if cores
     cmd_options << "--elevate=sudo" if delegate_elevation?
-    rebuild_cmd = ["nixos-rebuild", *cmd_options, rebuild_type]
-    rebuild_sudo = use_sudo && !delegate_elevation?
-
-    if rebuild
-      run(*rebuild_cmd, sudo: rebuild_sudo)
-    else
-      puts "Update flake: #{use_sudo ? '#' : '$'} nix flake update --flake #{install_path}"
-      puts "Rebuild NixOS: #{rebuild_sudo ? '#' : '$'} #{rebuild_cmd.join(' ')}"
-    end
-
-    # capture the successful lock file if we get this far
-    copy_lock_file if rebuild
+    command("nixos-rebuild", *cmd_options, rebuild_type, sudo: use_sudo && !delegate_elevation?)
   end
 
   def copy_lock_file
-    run "cp", File.join(install_path, "flake.lock"), File.join(config_dir, "flake.lock")
+    command("cp", File.join(install_path, "flake.lock"), File.join(config_dir, "flake.lock"))
+  end
+
+  # Without a rebuild, show the commands that would have followed instead.
+  def print_manual_steps
+    prompt = ->(cmd) { "#{cmd.sudo ? '#' : '$'} #{cmd.argv.join(' ')}" }
+    puts "Update flake: #{prompt.(flake_update_command)}"
+    puts "Rebuild NixOS: #{prompt.(rebuild_command)}"
+    puts "Collect garbage: $ #{garbage_command.argv.join(' ')}" unless gc.nil?
   end
 
   # Runs last: the rebuild has already added a generation, so trimming to the
@@ -206,21 +247,18 @@ class Script
   # entries left to strand. Anything else (a tighter SPEC, or no rebuild at all)
   # can strand them, and needs cleanup-nixos to reinstall the boot loader.
   def collect_garbage
-    return if gc.nil?
+    return [] if gc.nil? || !rebuild
 
+    [garbage_command]
+  end
+
+  def garbage_command
     reconciled = rebuild && gc == :auto
-    parts = [
+    command(*[
       self.class.cleanup_nixos_bin,
       reconciled ? nil : "--boot-sync",
       gc == :auto ? nil : gc,
-    ].compact
-
-    unless rebuild
-      puts "Collect garbage: $ #{parts.join(' ')}"
-      return
-    end
-
-    run(*parts)
+    ].compact)
   end
 
   def parse_options(argv)
