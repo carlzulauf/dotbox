@@ -20,6 +20,13 @@
     enable = true;
     host = lib.mkDefault "0.0.0.0";
     port = 4141; # AI! AI!
+    # nixpkgs passes `--set NAME value` as one makeWrapperArgs string, which
+    #  python packages' new __structuredAttrs default no longer word-splits
+    package = lib.mkDefault (pkgs.open-webui.overridePythonAttrs (old: {
+      makeWrapperArgs = [
+        "--set" "FRONTEND_BUILD_DIR" "${pkgs.open-webui.frontend}/share/open-webui"
+      ];
+    }));
     environment = {
       ANONYMIZED_TELEMETRY = "False";
       DO_NOT_TRACK = "True";

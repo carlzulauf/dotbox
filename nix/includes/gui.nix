@@ -1,4 +1,4 @@
-{ config, pkgs, lib, ... }:
+{ config, pkgs, lib, nixpkgs-pinned, ... }:
 
 let
   # Not packaged in nixpkgs, so pin the .vsix straight from Open VSX (the
@@ -25,7 +25,8 @@ in
     gimp inkscape
     signal-desktop
     keepassxc
-    vlc audacity
+    vlc
+    nixpkgs-pinned.audacity # pinned, see flake.nix
     playerctl
     wl-clipboard # wl-copy/wl-paste: lets micro & other TUIs use the system clipboard
     flatpak appimage-run
