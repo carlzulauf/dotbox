@@ -32,11 +32,9 @@ let
   configPath = "/etc/voxtype/config.toml";
 
   # CPU build with every ONNX engine (Cohere, Parakeet, ...) plus Whisper.
-  # Upstream PR #502 opens the feedback sounds' audio output per sound instead
-  # of holding it open for the daemon's lifetime. The open stream kept
-  # multipoint Bluetooth headsets from switching to another device (#859) and
-  # made every other recording on a Bluetooth mic stall after ~0.5s (#773).
-  # Drop this once #502 is merged and released.
+  # Applies patch from upstream PR [502](https://github.com/peteonrails/voxtype/pull/502)
+  # which fixes issues with daemon holding on to output devices, preventing
+  # device/default switching.
   onnxUnwrapped = voxtype.packages.${system}.voxtype-onnx-unwrapped.overrideAttrs (old: {
     patches = (old.patches or [ ]) ++ [
       (pkgs.fetchpatch {
