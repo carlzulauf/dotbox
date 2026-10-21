@@ -32,7 +32,20 @@ let
   configPath = "/etc/voxtype/config.toml";
 
   # CPU build with every ONNX engine (Cohere, Parakeet, ...) plus Whisper.
-  onnxUnwrapped = voxtype.packages.${system}.voxtype-onnx-unwrapped;
+  # Upstream PR #502 opens the feedback sounds' audio output per sound instead
+  # of holding it open for the daemon's lifetime. The open stream kept
+  # multipoint Bluetooth headsets from switching to another device (#859) and
+  # made every other recording on a Bluetooth mic stall after ~0.5s (#773).
+  # Drop this once #502 is merged and released.
+  onnxUnwrapped = voxtype.packages.${system}.voxtype-onnx-unwrapped.overrideAttrs (old: {
+    patches = (old.patches or [ ]) ++ [
+      (pkgs.fetchpatch {
+        name = "voxtype-pr502-feedback-stream.patch";
+        url = "https://github.com/peteonrails/voxtype/commit/242da0ebbb0b52ce41e90c3fd7647a55bbb6c83d.patch";
+        hash = "sha256-aS2gnTsGZc31Ar6BFTNKjOUkuGEJ9YjZFXNnoJGqpu4=";
+      })
+    ];
+  });
 
   # Upstream ships Whisper-on-Vulkan and the ONNX engines as separate builds;
   # the cargo features combine fine, so one binary gets both. Only Whisper
