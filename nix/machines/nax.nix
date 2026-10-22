@@ -12,7 +12,8 @@
     [
       nixos-hardware.nixosModules.common-cpu-amd
       nixos-hardware.nixosModules.common-cpu-amd-pstate
-      nixos-hardware.nixosModules.common-cpu-amd-zenpower
+      # Breaking build on 2026/10/22
+      # nixos-hardware.nixosModules.common-cpu-amd-zenpower
       nixos-hardware.nixosModules.common-gpu-amd
       ../includes/ai.nix
       ../includes/gui.nix
