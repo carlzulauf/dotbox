@@ -19,12 +19,6 @@
       ../includes/tv.nix
     ];
 
-  dotbox.filebrowser.extraSources = {
-    files = "/mnt/files/carl";
-    vault = "/mnt/vault/carl";
-    downloads = "/mnt/downloads/carl";
-  };
-
   environment.systemPackages = with pkgs; [
     nvtopPackages.amd
     file # signal-decode-v2 identifies decrypted attachments with it
