@@ -15,7 +15,6 @@
     [
       nixos-hardware.nixosModules.common-cpu-amd
       nixos-hardware.nixosModules.common-cpu-amd-pstate
-      nixos-hardware.nixosModules.common-cpu-amd-zenpower
       nixos-hardware.nixosModules.common-gpu-amd
       ../includes/gui.nix
       ../includes/tv.nix

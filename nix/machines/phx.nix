@@ -6,9 +6,6 @@
 
   imports =
     [
-      # DISABLED 3/26/2025 - preventing kernel from building
-      # nixos-hardware.nixosModules.common-cpu-amd-zenpower
-
       # these become superfluous when gpd profile is enabled:
       # nixos-hardware.nixosModules.common-cpu-amd-pstate
       # nixos-hardware.nixosModules.common-cpu-amd
