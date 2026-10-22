@@ -38,15 +38,4 @@
       };
     }
   ];
-
-  # web ui for machine admin
-  services.cockpit = {
-    enable = true;
-    port = 9090;
-    settings = {
-      WebService = {
-        AllowUnencrypted = true;
-      };
-    };
-  };
 }

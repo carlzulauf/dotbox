@@ -124,7 +124,7 @@ in
 
       docker-compose
       distrobox
-      terraform
+      terraform # deprecated
 
       nixpkgs-master.claude-code
       nixpkgs-master.pi-coding-agent

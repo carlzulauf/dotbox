@@ -4,76 +4,13 @@ let
   # target: building ROCm for every architecture at once OOMs this box.
   rocmTarget = "gfx1151";
 
-  # One ROCm package set for the whole machine. nixpkgs exposes a per-arch
-  # subscope (rocmPackages.<target>) which is exactly the
-  # `overrideScope (clr.override { localGpuTargets = [ target ]; })` that
-  # ds4.nix applies internally, so handing this same scope to both ds4 and
-  # ollama-rocm below makes them share one clr/hipblas/rocblas build rather
-  # than evaluating two identical-but-separate sets. ds4 is built either way,
-  # so a ROCm-capable ollama costs only rocsolver + rocsparse on top of it,
-  # plus ollama's own llama.cpp runner.
   rocmPkgs = nixpkgs-master.rocmPackages.${rocmTarget};
-
-  # ollama-rocm's rocmGpuTargets defaults to rocmPkgs.clr.localGpuTargets, so
-  # the GPU target follows rocmTarget without being restated here.
   ollamaRocm = nixpkgs-master.ollama-rocm.override { rocmPackages = rocmPkgs; };
   ollamaVulkan = nixpkgs-master.ollama-vulkan;
 
-  # Which GPU backend ollama uses by default. Both builds stay installed and
-  # $OLLAMA_BACKEND overrides this at startup (see ollamaSwitcher), so this is
-  # the declared default rather than the only reachable option.
-  #
-  # Vulkan wins on this iGPU today. Benchmarked 2026-08-21 across the models
-  # actually in use, identical blobs and runner settings, one runner at a time,
-  # box idle:
-  #
-  #   model            decode t/s (greedy)      prefill t/s @ ~6.5k tokens
-  #                    ROCm  Vulkan   gain      ROCm  Vulkan   gain
-  #   qwen3.8:27b     19.11   26.95  +41%        326     294   -10%
-  #   ornith-1.5:35b  63.35   76.65  +21%       1318    1037   -21%
-  #   gemma4:26b      56.90   66.79  +17%       1491    1412    -5%
-  #   qwen3.6:35b     61.64   71.08  +15%       1315    1138   -13%
-  #   ornith-1.5:9b   36.81   39.25   +7%       1044     897   -14%
-  #   gemma4:12b      25.85   27.33   +6%        717     715    -0%
-  #
-  # It is a trade, not a free win: Vulkan buys decode and pays prefill. Decode
-  # dominates unless the prompt is enormous relative to the reply - break-even
-  # is prompt > 45x generated tokens for qwen3.8, and > 11-13x for the ornith
-  # pair (their prefill regression is worst). Only an 8k-prompt/500-token-reply
-  # shape favours ROCm, and only by ~1%. Every ordinary chat shape favours
-  # Vulkan.
-  #
-  # TREAT THE TABLE AS A DATED SNAPSHOT, NOT A STANDING FACT. It measures one
-  # ollama, one mesa/RADV, one kernel and one ROCm; all four move fast and the
-  # gap has no reason to hold. Re-run the comparison after any of them jumps -
-  # that is what the runtime switch below is for.
-  #
-  # Caveat for future measurements: prefill throughput on a short (~30 token)
-  # prompt is meaningless - it measures fixed per-request overhead and made
-  # Vulkan look 23% FASTER at prefill when it is actually 0-21% slower. Measure
-  # prefill at >=1k tokens. Likewise measure decode at temperature 0: only
-  # qwen3.8 is temperature-sensitive (19.11 -> 15.46 t/s on ROCm at temp 1),
-  # being the one model here with an MTP draft head whose acceptance rate drops
-  # under stochastic sampling, but that is enough to poison a mixed comparison.
-  # Text output and vision (CLIP projector) both verified correct on Vulkan.
+  # vulkan generally outperformed ROCm during previous benchmarks, but due for retest
   ollamaBackend = "vulkan";
 
-  # Startup shim: `ollama` reads its backend from $OLLAMA_BACKEND, falling back
-  # to ollamaBackend. That variable is ours, not ollama's - ollama's own
-  # OLLAMA_LLM_LIBRARY picks between runners inside a single build, and nixpkgs
-  # compiles exactly one runner per package, so it cannot cross this boundary.
-  # Both real builds are installed, so an A/B run is a service restart rather
-  # than a rebuild:
-  #
-  #   systemctl edit --runtime ollama   # [Service] Environment=OLLAMA_BACKEND=rocm
-  #   systemctl restart ollama
-  #   systemctl revert ollama; systemctl restart ollama   # back to the default
-  #
-  # `ollama serve` locates its runner libraries (lib/ollama/<backend>/) by
-  # walking up from the *resolved* path of the running executable, so the shim
-  # has to exec into the real package. Symlinking the two builds into one
-  # merged tree would resolve back to whichever original store path won the
-  # collision and quietly lose the other backend's runner.
   ollamaSwitcher = pkgs.writeShellScriptBin "ollama" ''
     case "''${OLLAMA_BACKEND:-${ollamaBackend}}" in
       vulkan)
@@ -131,7 +68,6 @@ in
       ../includes/dev.nix
       ../includes/printing.nix
       ../includes/steam.nix
-      ../includes/t3code.nix
       ../includes/dictation.nix
     ];
 
@@ -161,24 +97,9 @@ in
   };
 
   programs.steam = {
-    # frix is the Remote Play host, running GNOME on Wayland. Two separate
-    # problems stop that from working hands-off:
-    #
-    # Video: without -pipewire Steam has no way to capture a Wayland desktop.
-    # It warns "Desktop capture unavailable, try running Steam with -pipewire"
-    # and streams "Desktop Black Frame" (see logs/streaming_log.txt), which is
-    # a black screen on the client with working audio and input. With it,
-    # Steam opens a ScreenCast portal session when it starts, and asks for a
-    # persistent grant (persist_mode/restore_token), so after the first
-    # "Share" later starts should not prompt.
+    # Required for wayland desktop capture during game streaming
     package = pkgs.steam.override { extraArgs = "-pipewire"; };
-
-    # Input: Steam injects streamed keyboard/mouse through XTest. Mutter always
-    # starts Xwayland with -enable-ei-portal, which turns an XTest client into
-    # a RemoteDesktop portal request ("Allow Remote Interaction"). Xwayland
-    # never asks for persistence, so the approval is forgotten and has to be
-    # given at the desk. extest reimplements XTest on /dev/uinput (uaccess'd by
-    # steam-hardware) so the portal is never involved.
+    # better input handling for game streaming, without portals
     extest.enable = true;
   };
 
@@ -198,20 +119,18 @@ in
 
   services.ollama = {
     package = ollamaSwitcher;
-
-    # OLLAMA_IGPU_ENABLE is mandatory, not tuning: ollama classifies the 8060S
-    # as an integrated GPU and, under Vulkan, silently drops it ("dropping
-    # integrated GPU") and falls back to CPU inference unless this is set. ROCm
-    # keeps the iGPU either way and is unharmed by it, so it is set for both
-    # rather than made conditional on the backend.
+    # The giant 8060S is technically an iGPU, and, yes, Ollama should use it
     environmentVariables.OLLAMA_IGPU_ENABLE = "1";
   };
 
-  # Keep ollama + open-webui installed and configured, but don't autostart them:
-  # they compete with ds4 for the single shared RAM/GPU pool. Start on demand
-  # with `systemctl start ollama` / `systemctl start open-webui`.
-  systemd.services.ollama.wantedBy = lib.mkForce [ ];
+  # Sometimes we don't want ollama to start by default since where using DS4
+  # or something else heavily, but for now this is commented out so it starts.
+  # systemd.services.ollama.wantedBy = lib.mkForce [ ];
+  # $ sudo systemctl start ollama
+
+  # Don't auto-start open-webui on frix. It's kind of a hog.
   systemd.services.open-webui.wantedBy = lib.mkForce [ ];
+  # $ sudo systemctl start open-webui
 
   # trying out experimental gnome features
   programs.dconf.profiles.user.databases = [
