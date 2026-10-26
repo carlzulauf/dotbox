@@ -6,6 +6,17 @@
     nixpkgs-master.llmfit
   ];
 
+  # posthog (open-webui -> chromadb -> posthog) is marked broken since mcp 2.x
+  #  only because one test fails; drop once NixOS/nixpkgs#578265 lands
+  nixpkgs.overlays = [ (final: prev: {
+    pythonPackagesExtensions = prev.pythonPackagesExtensions ++ [ (pyfinal: pyprev: {
+      posthog = pyprev.posthog.overridePythonAttrs (old: {
+        doCheck = false;
+        meta = old.meta // { broken = false; };
+      });
+    }) ];
+  }) ];
+
   # Both listen on every interface but leave the firewall closed, so they're
   # reachable over the tailnet (a trusted interface, see defaults.nix) and not
   # from the LAN. ollama has no authentication, and open-webui has none on the
