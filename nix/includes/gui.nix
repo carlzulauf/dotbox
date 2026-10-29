@@ -16,6 +16,19 @@ let
       hash = "sha256-FNn82+YOUpYb/wABL79HUx1/LN9GJAYBUKYmz4O0Er8=";
     };
   };
+
+  # Also Open VSX-only; same bump procedure as toggle-quotes above.
+  haml-hero = pkgs.vscode-utils.buildVscodeMarketplaceExtension {
+    mktplcRef = {
+      publisher = "XanderDoom";
+      name = "haml-hero";
+      version = "1.0.1";
+    };
+    vsix = pkgs.fetchurl {
+      url = "https://open-vsx.org/api/XanderDoom/haml-hero/1.0.1/file/XanderDoom.haml-hero-1.0.1.vsix";
+      hash = "sha256-nxTRSi/R1SGx+rQ2fgfbqGDvy4EKXDAMJREkPxetlWQ=";
+    };
+  };
 in
 
 {
@@ -40,7 +53,7 @@ in
         shopify.ruby-lsp
         stkb.rewrap
         streetsidesoftware.code-spell-checker
-      ]) ++ [ toggle-quotes ];
+      ]) ++ [ toggle-quotes haml-hero ];
     })
   ];
 
