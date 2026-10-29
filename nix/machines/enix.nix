@@ -25,6 +25,7 @@
       nixos-hardware.nixosModules.common-cpu-amd-pstate
       nixos-hardware.nixosModules.common-gpu-amd
       ../includes/gui.nix
+      ../includes/claude-desktop.nix
       ../includes/printing.nix
       ../includes/dictation.nix # Parakeet on the CPU
       ../includes/gnome.nix

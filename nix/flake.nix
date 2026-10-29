@@ -32,6 +32,10 @@
     voxtype.url = "github:peteonrails/voxtype";
     voxtype.inputs.nixpkgs.follows = "nixpkgs";
     voxtype.inputs.flake-utils.follows = "ds4/flake-utils";
+
+    # AI coding agents (claude-code, pi, claude-desktop, ...), updated daily.
+    #  No nixpkgs follows, so builds come from cache.numtide.com (see configuration.nix)
+    llm-agents.url = "github:numtide/llm-agents.nix";
   };
 
   outputs = {

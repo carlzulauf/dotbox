@@ -1,5 +1,8 @@
-{ config, pkgs, lib, nixpkgs-master, ... }:
+{ config, pkgs, lib, llm-agents, ... }:
 let
+  llmAgents = llm-agents.packages.${pkgs.stdenv.hostPlatform.system};
+
+
   # nix-direnv 3.2.0 misbehaves when several tmux windows load the same
   # flake-based .envrc at once, so stay on 3.1.2 (latest 3.1.x) until that's
   # fixed upstream. resholve builds nix-direnv in two stages, so the older
@@ -126,9 +129,9 @@ in
       distrobox
       terraform # deprecated
 
-      nixpkgs-master.claude-code
-      nixpkgs-master.pi-coding-agent
-      nixpkgs-master.agent-browser
+      llmAgents.claude-code
+      llmAgents.pi
+      llmAgents.agent-browser
     ]
     # terminfo for ghostty/kitty/foot/etc so remote tmux sessions work
     ++ terminfoPackages;
