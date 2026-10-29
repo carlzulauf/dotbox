@@ -6,7 +6,7 @@
   imports = [
     nixos-hardware.nixosModules.dell-xps-13-9350
     ../includes/gui.nix
-    ../includes/claude-desktop.nix
+    ../includes/ai-desktop.nix
     ../includes/dev.nix
     ../includes/ai.nix
     ../includes/gaming.nix

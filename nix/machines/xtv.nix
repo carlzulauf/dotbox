@@ -12,7 +12,7 @@
       nixos-hardware.nixosModules.common-gpu-amd
       ../includes/ai.nix
       ../includes/gui.nix
-      ../includes/claude-desktop.nix
+      ../includes/ai-desktop.nix
       ../includes/tv.nix
       ../includes/gaming.nix
       ../includes/printing.nix

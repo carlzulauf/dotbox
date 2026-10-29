@@ -59,7 +59,7 @@ in
       nixos-hardware.nixosModules.framework-desktop-amd-ai-max-300-series
       ../includes/ai.nix
       ../includes/gui.nix
-      ../includes/claude-desktop.nix
+      ../includes/ai-desktop.nix
       ../includes/gnome.nix
       ../includes/gnome-cosmic.nix
       ../includes/dev.nix
