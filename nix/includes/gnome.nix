@@ -19,6 +19,9 @@
     # toggles it mid-load (SUPERCILEX/gnome-clipboard-history#180)
     gnomeExtensions.clipboard-indicator
     gnomeExtensions.paperwm
+    # window snapping: Super+arrows to halves/quarters, Super+Return for a grid
+    gnomeExtensions.tiling-assistant
+    gnomeExtensions.gtile
 
     gparted resources
 
@@ -52,6 +55,17 @@
       # leaves a headless Remote Login session (remote-desktop-gnome.nix) with
       # no way out but Power Off -- and that takes the whole machine down.
       settings."org/gnome/shell".always-show-log-out = true;
+
+      # Super+Up/Down on a left/right half moves it to that side's top/bottom
+      # quarter. The dynamic behavior only applies to the tile-* shortcuts, and
+      # Super+Down defaults to restore-window, so move it to tile-bottom-half (which
+      # still restores a maximized window). No popup offering to fill the rest
+      settings."org/gnome/shell/extensions/tiling-assistant" = {
+        dynamic-keybinding-behavior = lib.gvariant.mkInt32 2;
+        tile-bottom-half = [ "<Super>Down" "<Super>KP_2" ];
+        restore-window = lib.gvariant.mkEmptyArray lib.gvariant.type.string;
+        enable-tiling-popup = false;
+      };
     }
   ];
 
