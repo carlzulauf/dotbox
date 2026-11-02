@@ -71,7 +71,7 @@ class Script
   # Packages in nix/pkgs that pin an upstream release and have an `update`
   # script to bump it, run by --upgrade.
   def self.updatable_packages
-    %w[t3code-desktop]
+    %w[t3code-desktop open-vsx-extensions]
   end
 
   # Prefer the copy in this repo so --gc works before dotfiles are installed.

@@ -1,35 +1,4 @@
-{ config, pkgs, lib, nixpkgs-pinned, ... }:
-
-let
-  # Not packaged in nixpkgs, so pin the .vsix straight from Open VSX (the
-  # marketplace VSCodium itself uses). Bump version + hash together; get the
-  # new hash with:
-  #   nix-prefetch-url <url> | xargs nix hash convert --hash-algo sha256
-  toggle-quotes = pkgs.vscode-utils.buildVscodeMarketplaceExtension {
-    mktplcRef = {
-      publisher = "britesnow";
-      name = "vscode-toggle-quotes";
-      version = "0.3.6";
-    };
-    vsix = pkgs.fetchurl {
-      url = "https://open-vsx.org/api/britesnow/vscode-toggle-quotes/0.3.6/file/britesnow.vscode-toggle-quotes-0.3.6.vsix";
-      hash = "sha256-FNn82+YOUpYb/wABL79HUx1/LN9GJAYBUKYmz4O0Er8=";
-    };
-  };
-
-  # Also Open VSX-only; same bump procedure as toggle-quotes above.
-  haml-hero = pkgs.vscode-utils.buildVscodeMarketplaceExtension {
-    mktplcRef = {
-      publisher = "XanderDoom";
-      name = "haml-hero";
-      version = "1.0.1";
-    };
-    vsix = pkgs.fetchurl {
-      url = "https://open-vsx.org/api/XanderDoom/haml-hero/1.0.1/file/XanderDoom.haml-hero-1.0.1.vsix";
-      hash = "sha256-nxTRSi/R1SGx+rQ2fgfbqGDvy4EKXDAMJREkPxetlWQ=";
-    };
-  };
-in
+{ config, pkgs, lib, ... }:
 
 {
   environment.systemPackages = with pkgs; [
@@ -53,7 +22,7 @@ in
         shopify.ruby-lsp
         stkb.rewrap
         streetsidesoftware.code-spell-checker
-      ]) ++ [ toggle-quotes haml-hero ];
+      ]) ++ pkgs.callPackage ../pkgs/open-vsx-extensions { };
     })
   ];
 

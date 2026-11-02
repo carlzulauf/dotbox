@@ -1,0 +1,57 @@
+#!/usr/bin/env ruby
+
+# === Bump nix/pkgs/open-vsx-extensions to the latest Open VSX releases ===
+# Reads each extension's latest version from the Open VSX API, plus the sha256
+# Open VSX publishes for its .vsix, so nothing large is downloaded, and
+# rewrites them in extensions.json.
+#
+# Usage:
+#   nix/pkgs/open-vsx-extensions/update            # bump every extension
+#   nix/pkgs/open-vsx-extensions/update --check    # show what would change
+
+require "base64"
+require "json"
+require "open-uri"
+
+API = "https://open-vsx.org/api"
+JSON_FILE = File.join(__dir__, "extensions.json")
+
+check = ARGV.delete("--check")
+
+def fetch(url)
+  URI.open(url).read
+rescue OpenURI::HTTPError => e
+  abort "Couldn't fetch #{url}: #{e.message}"
+end
+
+extensions = JSON.parse(File.read(JSON_FILE))
+changed = false
+
+extensions.each do |ext|
+  id = "#{ext['publisher']}.#{ext['name']}"
+  latest = JSON.parse(fetch("#{API}/#{ext['publisher']}/#{ext['name']}"))
+
+  # The latest release can be a pre-release; leave those for a manual bump.
+  if latest["preRelease"]
+    puts "#{id}: skipping pre-release #{latest['version']}"
+    next
+  end
+
+  version = latest.fetch("version")
+  # Open VSX publishes the hex sha256, but fetchurl wants an SRI hash.
+  hex = fetch(latest.fetch("files").fetch("sha256"))[/\A\h{64}/] or
+    abort "No sha256 for #{id} #{version}"
+  hash = "sha256-#{Base64.strict_encode64([hex].pack('H*'))}"
+
+  if ext["version"] == version && ext["hash"] == hash
+    puts "#{id} is already at #{version}"
+    next
+  end
+
+  puts "#{id}: #{ext['version']} -> #{version}"
+  ext["version"] = version
+  ext["hash"] = hash
+  changed = true
+end
+
+File.write(JSON_FILE, JSON.pretty_generate(extensions) + "\n") if changed && !check

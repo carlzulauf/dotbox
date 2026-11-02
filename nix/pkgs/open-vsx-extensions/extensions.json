@@ -1,0 +1,14 @@
+[
+  {
+    "publisher": "britesnow",
+    "name": "vscode-toggle-quotes",
+    "version": "0.3.6",
+    "hash": "sha256-FNn82+YOUpYb/wABL79HUx1/LN9GJAYBUKYmz4O0Er8="
+  },
+  {
+    "publisher": "XanderDoom",
+    "name": "haml-hero",
+    "version": "1.0.1",
+    "hash": "sha256-nxTRSi/R1SGx+rQ2fgfbqGDvy4EKXDAMJREkPxetlWQ="
+  }
+]
