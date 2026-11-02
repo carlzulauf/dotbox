@@ -69,7 +69,7 @@
   environment.systemPackages = with pkgs; [ wavemon ];
 
   # Make the lid just lock, not suspend. I'll have to enter suspend manually.
-  services.logind.lidSwitch = "lock";
+  services.logind.settings.Login.HandleLidSwitch = "lock";
   services.fwupd.enable = true;
 
   # The release this machine was first installed with. Never change it.

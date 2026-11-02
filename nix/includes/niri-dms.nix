@@ -21,13 +21,13 @@
 { config, lib, pkgs, ... }:
 let
   user = "carl";
-  dms = lib.getExe' config.programs.dms-shell.package "dms";
+  dms = lib.getExe' config.programs.dux-shell.package "dms";
 in
 {
   programs.niri.enable = true;
-  programs.dms-shell.enable = true;
+  programs.dux-shell.enable = true;
 
-  services.displayManager.dms-greeter = {
+  services.displayManager.dux-greeter = {
     enable = true;
     compositor.name = "niri";
     # Copies the user's DMS theme and wallpaper so the greeter matches it.
