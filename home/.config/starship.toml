@@ -1,4 +1,8 @@
 format = '$username$hostname$custom in $localip$shlvl$singularity$kubernetes$directory$vcsh$git_branch$git_commit$git_state$git_metrics$git_status$hg_branch$docker_context$package$bun$c$cmake$cobol$daml$dart$deno$dotnet$elixir$elm$erlang$golang$haskell$helm$java$julia$kotlin$lua$nim$nodejs$ocaml$perl$php$pulumi$purescript$python$raku$rlang$red$ruby$rust$scala$swift$terraform$vlang$vagrant$zig$buf$nix_shell$conda$meson$spack$memory_usage$env_var$crystal$sudo$cmd_duration$time$line_break$jobs$battery$status$shell$character'
+# Raised from the defaults (30 / 500 ms): slow machines and cold caches after idle hit them
+scan_timeout = 300
+command_timeout = 1000
+
 ## FIRST LINE/ROW: Info & Status
 # First param ─┌
 [username]
