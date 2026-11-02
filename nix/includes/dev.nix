@@ -18,7 +18,13 @@
 
     sql-formatter # node based command line sql format tool
 
-    omnissa-horizon-client
+    # nixpkgs puts gtk2 (marked broken ahead of its removal) in Horizon's FHS
+    #  env, but the client only links GTK3, so leave it out
+    (omnissa-horizon-client.override {
+      buildFHSEnv = args: buildFHSEnv (args // {
+        targetPkgs = p: builtins.filter (d: (d.pname or "") != "gtk+") (args.targetPkgs p);
+      });
+    })
   ];
 
   networking.firewall.allowedTCPPorts = [
