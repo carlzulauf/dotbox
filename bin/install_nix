@@ -10,7 +10,8 @@
 # Options:
 #   -s, --switch                Rebuild in 'switch' mode (active immediately)
 #   -b, --boot                  Rebuild in 'boot' mode (active next boot)
-#   -u, --upgrade, --update     Update flake.lock and rebuild
+#   -u, --upgrade, --update     Bump nix/pkgs with update scripts, update
+#                               flake.lock, and rebuild
 #   -r, --rebuild               Run nixos-rebuild after copying configs
 #       --no-rebuild            Disable rebuild, and the flake update with it
 #                               (wins over every other option, in any order)
@@ -67,6 +68,12 @@ class Script
     `hostname`.strip
   end
 
+  # Packages in nix/pkgs that pin an upstream release and have an `update`
+  # script to bump it, run by --upgrade.
+  def self.updatable_packages
+    %w[t3code-desktop]
+  end
+
   # Prefer the copy in this repo so --gc works before dotfiles are installed.
   def self.cleanup_nixos_bin
     local = File.expand_path(File.join(File.dirname(__FILE__), "..", "home", ".local", "bin", "cleanup-nixos"))
@@ -99,6 +106,7 @@ class Script
   def call
     commands = [
       sync_hardware_config,
+      update_packages,
       copy_nix_files,
       nixos_rebuild,
       collect_garbage
@@ -170,6 +178,22 @@ class Script
     end
   end
 
+  # Bump the packages in nix/pkgs before they are copied to install_path. Like
+  # the flake update, this only runs with a rebuild, so every bump gets built
+  # (a failed build leaves the bump in the repo, to fix or revert).
+  def update_packages
+    return [] unless rebuild && upgrade
+
+    package_update_commands
+  end
+
+  # The scripts rewrite their package's files in config_dir, so no sudo.
+  def package_update_commands
+    self.class.updatable_packages.map do |package|
+      command(File.join(config_dir, "pkgs", package, "update"))
+    end
+  end
+
   # Mirror the whole nix/ tree, deleting anything in install_path that is no
   # longer in the repo, so renamed or removed files don't linger there.
   # hardware-configuration.nix is generated on each machine and isn't in nix/,
@@ -234,6 +258,7 @@ class Script
   # Without a rebuild, show the commands that would have followed instead.
   def print_manual_steps
     prompt = ->(cmd) { "#{cmd.sudo ? '#' : '$'} #{cmd.argv.join(' ')}" }
+    package_update_commands.each { |cmd| puts "Update package: #{prompt.(cmd)}" }
     puts "Update flake: #{prompt.(flake_update_command)}"
     puts "Rebuild NixOS: #{prompt.(rebuild_command)}"
     puts "Collect garbage: $ #{garbage_command.argv.join(' ')}" unless gc.nil?
@@ -266,7 +291,7 @@ class Script
 
     {}.tap do |parsed|
       remainders = OptionParser.new do |op|
-        op.on("--upgrade", "--update", "-u", "Upgrade: update every input in flake.lock, then rebuild") do
+        op.on("--upgrade", "--update", "-u", "Upgrade: bump nix/pkgs with update scripts, update every input in flake.lock, then rebuild") do
           parsed[:upgrade] = true
           parsed[:rebuild] = true
         end
