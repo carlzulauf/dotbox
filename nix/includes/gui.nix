@@ -39,7 +39,7 @@ in
     signal-desktop
     keepassxc
     vlc
-    nixpkgs-pinned.audacity # pinned, see flake.nix
+    audacity
     playerctl
     wl-clipboard # wl-copy/wl-paste: lets micro & other TUIs use the system clipboard
     flatpak appimage-run

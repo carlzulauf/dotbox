@@ -8,9 +8,8 @@
     #  as an escape hatch when an unstable pkg is broken
     nixpkgs-master.url = "github:NixOS/nixpkgs/master";
 
-    # last nixos-unstable before two breakages; drop once both are fixed:
-    #  - audacity 4.0.0 fails against Qt 6.12 (ambiguous `Type` in qmlcachegen output)
-    #  - patchelf 0.19 aborts re-patching pulsar's bundled node (see includes/dev.nix)
+    # last nixos-unstable before patchelf 0.19, which aborts re-patching
+    #  pulsar's bundled node (see includes/dev.nix); drop once that's fixed
     nixpkgs-pinned.url = "github:NixOS/nixpkgs/fe13242281a67641c0102cdb1087f0ebe586c7df";
 
     # used for better per-machine hardware support

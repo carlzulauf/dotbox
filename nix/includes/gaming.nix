@@ -1,15 +1,12 @@
-{ config, pkgs, nixpkgs-master, ... }:
+{ config, pkgs, ... }:
 
 {
   imports = [ ./steam.nix ];
 
   environment.systemPackages = with pkgs; [
     discord
-    mangohud gamemode
-    heroic lutris
+    mangohud gamemode goverlay
     prismlauncher
     openrct2
-  ] ++ [
-    nixpkgs-master.goverlay # unstable's lazarus broken 2026-10-02, fixed in master
   ];
 }
