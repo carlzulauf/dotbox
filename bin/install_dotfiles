@@ -207,9 +207,11 @@ class InstallDotfiles < Struct.new(:options)
     directories = []
     changes = []
     src.children.each do |child|
-      if child.directory?
+      # symlinks to directories are treated as files, so skip them here
+      if child.directory? && !child.symlink?
         directories << child
-      elsif child.file?
+      # broken symlinks say false to file?, so make sure broken symlinks are treated like files too
+      elsif child.file? || child.symlink?
         changes << check_file(child, dest.join(child.basename), symlinks, optional)
       else
         raise "wat (not file or directory, but child): #{child.inspect}"
@@ -326,7 +328,7 @@ class InstallDotfiles < Struct.new(:options)
   end
 
   def check_symlink(src, dest, optional)
-    src = src.realpath if src.symlink?
+    src = src.realdirpath if src.symlink?
     create_symlink = -> do
       puts "Creating symlink to `#{src}` at `#{dest}`"
       mkpath(dest.parent)
