@@ -328,14 +328,17 @@ class InstallDotfiles < Struct.new(:options)
   end
 
   def check_symlink(src, dest, optional)
-    src = src.realdirpath if src.symlink?
+    src_dir = src.directory? ? src : src.dirname
+    src = src.readlink.expand_path(src_dir) if src.symlink?
+
     create_symlink = -> do
       puts "Creating symlink to `#{src}` at `#{dest}`"
       mkpath(dest.parent)
       FileUtils.symlink(src, dest)
     end
+
     if dest.symlink?
-      if dest.exist? && dest.realpath == src
+      if dest.exist? && dest.readlink.expand_path(src_dir) == src
         change("✓", src, dest) # do nothing
       else
         change("↺", src, dest) do
