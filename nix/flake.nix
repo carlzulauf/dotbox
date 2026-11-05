@@ -75,6 +75,16 @@
       if builtins.pathExists ./hardware/${host}.nix
       then ./hardware/${host}.nix
       else ./hardware-configuration.nix;
+    # Public cert of each machine's puma-dev CA, generated in ~/.puma-dev-ssl
+    # and checked in under puma-dev/ by bin/install_nix. The key stays on the
+    # machine. builtins.path stores the cert on its own, so changes elsewhere in
+    # the repo don't rebuild the CA bundle or restart puma-dev.
+    pumaDevCa = host: {
+      services.puma-dev.caCertificate =
+        if builtins.pathExists ./puma-dev/${host}.pem
+        then builtins.path { path = ./puma-dev/${host}.pem; name = "puma-dev-ca-${host}.pem"; }
+        else null;
+    };
     mkHost = host: nixpkgs.lib.nixosSystem {
       system = "x86_64-linux";
       inherit specialArgs;
@@ -85,6 +95,7 @@
         ./includes/carl.nix
         ./machines/${host}.nix
         puma-dev.nixosModules.puma-dev
+        (pumaDevCa host)
         ds4.nixosModules.ds4
       ];
     };

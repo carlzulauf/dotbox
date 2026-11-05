@@ -106,6 +106,7 @@ class Script
   def call
     commands = [
       sync_hardware_config,
+      sync_puma_dev_ca,
       update_packages,
       copy_nix_files,
       nixos_rebuild,
@@ -176,6 +177,53 @@ class Script
     else
       []
     end
+  end
+
+  # puma-dev's CA lives in ~/.puma-dev-ssl, generated on each machine by
+  # bin/puma_dev_ca, so its key never enters the Nix store or leaves the
+  # machine. Its public cert is checked into the repo as nix/puma-dev/<host>.pem,
+  # which the flake trusts. The ~/.puma-dev-ssl copy wins, and replaces the repo
+  # copy when that is missing or different. Like the hardware config, only done
+  # for the machine being installed on, and only when its machine config
+  # enables puma-dev.
+  def sync_puma_dev_ca
+    return [] if host != self.class.default_host || host == "generic"
+
+    machine = File.join(config_dir, "machines", "#{host}.nix")
+    return [] unless File.exist?(machine) && File.read(machine).include?("services.puma-dev")
+
+    ssl_dir = File.expand_path("~/.puma-dev-ssl")
+    cert = File.join(ssl_dir, "cert.pem")
+    tracked = File.join(config_dir, "puma-dev", "#{host}.pem")
+    copy = command("cp", cert, tracked, notice: "Updated #{tracked} from #{cert}; commit it to the repo.")
+    tracked_dir = File.dirname(tracked)
+    mkdir = File.directory?(tracked_dir) ? [] : [command("mkdir", "-p", tracked_dir)]
+
+    if puma_dev_ca_usable?(ssl_dir)
+      return [] if File.exist?(tracked) && FileUtils.compare_file(cert, tracked)
+
+      [*mkdir, copy]
+    else
+      [
+        command(File.expand_path("puma_dev_ca", __dir__), "--force", ssl_dir, host),
+        *mkdir,
+        copy,
+      ]
+    end
+  end
+
+  # A CA is replaced when either half is missing, they don't match, or it is
+  # one the old puma-dev flake generated in the Nix store (subject exactly
+  # "puma-dev CA"), whose private key is world-readable there.
+  def puma_dev_ca_usable?(ssl_dir)
+    key_path = File.join(ssl_dir, "key.pem")
+    cert_path = File.join(ssl_dir, "cert.pem")
+    return false unless File.exist?(key_path) && File.exist?(cert_path)
+
+    require 'openssl'
+    cert = OpenSSL::X509::Certificate.new(File.read(cert_path))
+    key = OpenSSL::PKey.read(File.read(key_path))
+    cert.subject.to_s != "/CN=puma-dev CA" && cert.check_private_key(key)
   end
 
   # Bump the packages in nix/pkgs before they are copied to install_path. Like

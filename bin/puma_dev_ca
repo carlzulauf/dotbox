@@ -1,0 +1,57 @@
+#!/usr/bin/env ruby
+
+# === puma-dev CA Generator ===
+# Generates the CA puma-dev signs its .test certs with: DIR/key.pem (mode 600)
+# and DIR/cert.pem. The key never leaves this machine; bin/install_nix copies
+# only cert.pem into nix/puma-dev/<host>.pem, which the flake trusts.
+#
+# Usage:
+#   bin/puma_dev_ca [--force] [DIR] [HOST]
+#
+#   DIR    defaults to ~/.puma-dev-ssl
+#   HOST   named in the CA's subject, defaults to `hostname`
+#   --force  replace an existing CA in DIR
+
+require 'fileutils'
+require 'openssl'
+
+force = !ARGV.delete("--force").nil?
+dir = File.expand_path(ARGV[0] || "~/.puma-dev-ssl")
+host = ARGV[1] || `hostname`.strip
+key_path = File.join(dir, "key.pem")
+cert_path = File.join(dir, "cert.pem")
+
+if !force && (File.exist?(key_path) || File.exist?(cert_path))
+  abort "#{dir} already holds a CA; pass --force to replace it."
+end
+
+key = OpenSSL::PKey::RSA.new(2048)
+
+cert = OpenSSL::X509::Certificate.new
+cert.version = 2
+cert.serial = OpenSSL::BN.rand(64)
+cert.subject = cert.issuer = OpenSSL::X509::Name.new([["CN", "puma-dev CA (#{host})"]])
+cert.public_key = key.public_key
+cert.not_before = Time.now - 60
+cert.not_after = cert.not_before + 3650 * 24 * 60 * 60
+
+extensions = OpenSSL::X509::ExtensionFactory.new
+extensions.subject_certificate = extensions.issuer_certificate = cert
+cert.add_extension(extensions.create_extension("basicConstraints", "CA:TRUE", true))
+cert.add_extension(extensions.create_extension("keyUsage", "keyCertSign,cRLSign", true))
+cert.add_extension(extensions.create_extension("subjectKeyIdentifier", "hash"))
+cert.sign(key, OpenSSL::Digest::SHA256.new)
+
+FileUtils.mkdir_p(dir, mode: 0o700)
+
+# Write both under temporary names and rename them into place, so an
+# interrupted run never leaves a key that doesn't match its cert.
+File.open("#{key_path}.new", File::WRONLY | File::CREAT | File::TRUNC, 0o600) do |file|
+  file.chmod(0o600)
+  file.write(key.private_to_pem)
+end
+File.write("#{cert_path}.new", cert.to_pem)
+File.rename("#{key_path}.new", key_path)
+File.rename("#{cert_path}.new", cert_path)
+
+puts "Generated #{cert.subject} in #{dir}"

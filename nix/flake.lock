@@ -212,11 +212,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1777246563,
-        "narHash": "sha256-x79Dl94W2DzCArVA51AHE70oD6ZJGYe9G5bVJOtTyu4=",
+        "lastModified": 1793904934,
+        "narHash": "sha256-NwHFBeV3/l/4Zrbd01UPkynSASEx/++6VXqRB+w09oI=",
         "owner": "carlzulauf",
         "repo": "puma-dev-flake",
-        "rev": "5ba545ab26d12980974539d03456d571c15b0f44",
+        "rev": "84603fdcb91c33a17c79c9773ac1327328a6b240",
         "type": "github"
       },
       "original": {
