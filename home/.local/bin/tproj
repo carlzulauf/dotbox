@@ -1,5 +1,6 @@
 #!/usr/bin/env ruby
 
+require "json"
 require "yaml"
 require "open3"
 require "optparse"
@@ -399,6 +400,14 @@ class Script < Struct.new(:options)
         options["flake"] = true
       end
 
+      op.on("--list", "List the configured projects") do
+        options["list"] = true
+      end
+
+      op.on("--json", "With --list, print JSON, as overbee reads it") do
+        options["json"] = true
+      end
+
       op.on("--debug", "Enable debug output") do
         Trace.enabled = true
       end
@@ -441,6 +450,8 @@ class Script < Struct.new(:options)
   end
 
   def call
+    return list if options["list"]
+
     project = find_or_create_project
     self.class.example_usage unless project
     project.apply(options)
@@ -459,6 +470,25 @@ class Script < Struct.new(:options)
 
     # if we have any of these options besides just abbr
     Project.new(options) if %w[dir distrobox windows worktree].any? { |key| options[key] }
+  end
+
+  def list
+    projects = registry.projects
+    return puts(projects.map(&:abbr)) unless options["json"]
+
+    puts JSON.generate(projects.map { |project| list_entry(project) })
+  end
+
+  def list_entry(project)
+    {
+      key: project.key,
+      abbr: project.options["abbr"],
+      dir: project.project_dir,
+      exists: Dir.exist?(project.project_dir),
+      session: project.session,
+      windows: project.windows,
+      distrobox: project.options["distrobox"].to_s,
+    }
   end
 
   def registry
