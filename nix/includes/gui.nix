@@ -3,7 +3,7 @@
 {
   environment.systemPackages = with pkgs; [
     firefox firefox-devedition
-    google-chrome chromium brave
+    google-chrome chromium
     gimp inkscape
     signal-desktop
     keepassxc
