@@ -8,10 +8,6 @@
     #  as an escape hatch when an unstable pkg is broken
     nixpkgs-master.url = "github:NixOS/nixpkgs/master";
 
-    # last nixos-unstable before patchelf 0.19, which aborts re-patching
-    #  pulsar's bundled node (see includes/dev.nix); drop once that's fixed
-    nixpkgs-pinned.url = "github:NixOS/nixpkgs/fe13242281a67641c0102cdb1087f0ebe586c7df";
-
     # used for better per-machine hardware support
     nixos-hardware.url = "github:NixOS/nixos-hardware/master";
     nixos-hardware.inputs.nixpkgs.follows = "nixpkgs";
@@ -50,9 +46,6 @@
       nixpkgs-master = import attrs.nixpkgs-master {
         system = "x86_64-linux";
         config.allowUnfree = true;
-      };
-      nixpkgs-pinned = import attrs.nixpkgs-pinned {
-        system = "x86_64-linux";
       };
     };
     activeHosts = [

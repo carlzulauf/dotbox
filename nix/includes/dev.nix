@@ -1,14 +1,10 @@
-{ config, pkgs, nixpkgs-master, nixpkgs-pinned, ... }:
+{ config, pkgs, nixpkgs-master, ... }:
 
 {
   environment.systemPackages = with pkgs; [
     sakura alacritty ghostty
     slack
-    # patchelf 0.19 trips a `splitIndex == -1` assertion setting the rpath a
-    #  second time on resources/app/ppm/bin/node; 0.15 from the pin handles it
-    (pulsar.overrideAttrs (old: {
-      preFixup = "PATH=${nixpkgs-pinned.patchelf}/bin:$PATH\n" + old.preFixup;
-    }))
+    pulsar
     zoom-us
     libreoffice
     insomnia
