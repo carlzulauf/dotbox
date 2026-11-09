@@ -44,6 +44,16 @@
   programs.ssh.enableAskPassword = true; # SSH_ASKPASS for GUI passphrase prompts
   programs.ssh.setXAuthLocation = true; # XAuthLocation, for `ssh -X`
 
+  # sudo with no terminal (Claude Code, editor tasks, scripts) prompts for the
+  # password in a GUI dialog. sudo only uses the helper when there is no tty and
+  # DISPLAY is set, so terminal sudo is unchanged. Fingerprint auth still runs
+  # first: touch the sensor, or wait for it to time out and the dialog appears.
+  environment.etc."sudo.conf".text = ''
+    Path askpass ${pkgs.writeShellScript "sudo-askpass" ''
+      exec ${lib.getExe pkgs.zenity} --entry --hide-text --title=sudo --text="''${1:-Password:}"
+    ''}
+  '';
+
   services.pulseaudio.enable = false;
   security.rtkit.enable = true;
   services.pipewire = {
