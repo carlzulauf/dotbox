@@ -39,5 +39,6 @@
     // turn off when doing merge conflicts to avoid unrelated changes
     "editor.formatOnSave": true,
     "editor.formatOnType": true
-  }
+  },
+  "security.workspace.trust.untrustedFiles": "open"
 }
