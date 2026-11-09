@@ -36,6 +36,9 @@ let
   # which fixes issues with daemon holding on to output devices, preventing
   # device/default switching.
   onnxUnwrapped = voxtype.packages.${system}.voxtype-onnx-unwrapped.overrideAttrs (old: {
+    # nixpkgs' cargo-setup-hook now has onig_sys and libsqlite3-sys use system
+    #  libraries, which voxtype's flake doesn't declare
+    buildInputs = (old.buildInputs or [ ]) ++ [ pkgs.oniguruma pkgs.sqlite ];
     patches = (old.patches or [ ]) ++ [
       (pkgs.fetchpatch {
         name = "voxtype-pr502-feedback-stream.patch";
