@@ -51,11 +51,6 @@
       # Undocumented in the schema description but present in the flags enum.
       settings."org/gnome/mutter".experimental-features = [ "xwayland-native-scaling" ];
 
-      # GNOME hides Log Out for the only account with the only session, which
-      # leaves a headless Remote Login session (remote-desktop-gnome.nix) with
-      # no way out but Power Off -- and that takes the whole machine down.
-      settings."org/gnome/shell".always-show-log-out = true;
-
       # Super+Up/Down on a left/right half moves it to that side's top/bottom
       # quarter. The dynamic behavior only applies to the tile-* shortcuts, and
       # Super+Down defaults to restore-window, so move it to tile-bottom-half (which
