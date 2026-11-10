@@ -39,3 +39,8 @@ end
 if type -q nixos-rebuild
   alias nix-list-generations="nixos-rebuild list-generations"
 end
+
+if type -q virsh
+  alias virshs="virsh -c qemu:///system"
+  alias virshsys="virsh -c qemu:///system"
+end
