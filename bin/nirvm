@@ -127,7 +127,9 @@ class Script
       File.write(xml, domain_xml(nic))
       virsh "define", xml
     end
-    virsh "autostart", NAME
+
+    # If we want the vm to autostart, which we probably don't
+    # virsh "autostart", NAME
 
     return puts("Defined #{NAME}; start it with `virsh -c #{connect} start #{NAME}`.") unless options[:start]
 
