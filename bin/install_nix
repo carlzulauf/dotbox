@@ -329,6 +329,7 @@ class Script
     reconciled = rebuild && gc == :auto
     command(*[
       self.class.cleanup_nixos_bin,
+      "--summary",
       reconciled ? nil : "--boot-sync",
       gc == :auto ? nil : gc,
     ].compact)

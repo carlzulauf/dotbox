@@ -9,6 +9,7 @@
 #     cleanup-nixos 30d           # drop generations older than 30 days
 #     cleanup-nixos -n old        # show what "keep only the active one" would run
 #     cleanup-nixos --boot-sync   # reinstall the boot loader after trimming
+#     cleanup-nixos --summary     # hide each command's output behind a one-line summary
 #
 # More info: cleanup-nixos -h
 #
@@ -36,6 +37,11 @@
 # when the spec is tighter than the configurationLimit the boot loader last wrote
 # with. A bare run straight after a rebuild trims exactly the generations whose
 # entries that rebuild already dropped, so it has nothing to reconcile.
+#
+# --summary captures each command's output instead of streaming it (the garbage
+# collector alone prints a line per deleted store path), and shows just the
+# generations removed and the space freed. A failed command's output is shown
+# in full.
 
 require "optparse"
 
@@ -47,7 +53,7 @@ FALLBACK_GENERATIONS = "+5"
 
 class Script < Struct.new(:options, :spec)
   def self.parse_options(argv)
-    options = { dry_run: false, boot_sync: false }
+    options = { dry_run: false, boot_sync: false, summary: false }
 
     OptionParser.new do |op|
       op.banner = "Usage: cleanup-nixos [options] [generation-spec]"
@@ -58,6 +64,10 @@ class Script < Struct.new(:options, :spec)
 
       op.on("--boot-sync", "Reinstall the boot loader after trimming, dropping stale entries") do
         options[:boot_sync] = true
+      end
+
+      op.on("--summary", "Show a one-line summary of each command's output instead of all of it") do
+        options[:summary] = true
       end
 
       op.on("-h", "--help") do
@@ -139,10 +149,30 @@ class Script < Struct.new(:options, :spec)
       puts " $ #{cmd.join(' ')}"
       next if options[:dry_run]
 
-      failed << cmd unless system(*cmd)
+      ok = options[:summary] ? run_summarized(cmd) : system(*cmd)
+      failed << cmd unless ok
     end
 
     report_failures(failed) unless failed.empty?
+  end
+
+  # stdin stays the terminal's, so sudo can still prompt if its ticket expired.
+  def run_summarized(cmd)
+    output = IO.popen(cmd, err: [:child, :out], &:read)
+    ok = $?.success?
+    lines = ok ? summary_lines(output) : output.lines.map(&:chomp)
+    lines.each { |line| puts "     #{line}" }
+    ok
+  end
+
+  # nix-env prints a line per generation it removes; nix-collect-garbage ends
+  # with "N store paths deleted, X MiB freed".
+  def summary_lines(output)
+    removed = output.scan(/^removing profile version /).size
+    [
+      *(removed.positive? ? ["removed #{removed} generation#{'s' unless removed == 1}"] : []),
+      *output.lines.map(&:strip).grep(/store paths deleted/),
+    ]
   end
 
   def report_failures(failed)
