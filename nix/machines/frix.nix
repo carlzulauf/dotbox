@@ -102,6 +102,15 @@ in
 
   services.fwupd.enable = true;
 
+  # Boot straight into a desktop so it can be reached over RDP without
+  # anyone at the greeter. With no defaultSession set, GDM starts whichever
+  # session was used last. Autologin leaves the login keyring locked, which
+  # remote-desktop-gnome.nix works around.
+  services.displayManager.autoLogin = {
+    enable = true;
+    user = "carl";
+  };
+
   # Super+Q dictates with Cohere Transcribe (CPU), Super+Shift+Q with Whisper
   # large-v3-turbo (GPU). Swap engine and alternateEngine to swap the keys.
   dotbox.dictation = {

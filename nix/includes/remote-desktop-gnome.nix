@@ -58,11 +58,18 @@ in
     unitConfig.ConditionPathExists = "%h/.config/remote-desktop/rdp-password";
   };
 
-  # Screen-share mode keeps its settings in the user's dconf and its
-  # credentials in the login keyring (libsecret). Reapplied every login so
-  # a change in GNOME Settings doesn't stick. The keyring has to be
-  # unlocked, which a password login at GDM does; a fingerprint login
-  # leaves it locked and the host would show an unlock prompt.
+  # Screen-share mode keeps its settings in the user's dconf. Reapplied
+  # every login so a change in GNOME Settings doesn't stick.
+  #
+  # Its credentials it only ever reads through libsecret, and `grdctl rdp
+  # set-credentials` writes them to the login keyring - which autologin and
+  # fingerprint logins leave locked, so the daemon then denies every client
+  # ("Credentials are not set"). Instead the credentials go, from the
+  # password file, into gnome-keyring's in-memory "session" collection: it
+  # is always unlocked, never written to disk, and gone at logout. The
+  # daemon's lookup matches on the schema name alone, so it finds the item
+  # there. Any old copy is cleared first so a stale password in the login
+  # keyring can't win the lookup.
   #
   # Port negotiation is off so a taken port is an error, not a silent move
   # to some other port.
@@ -71,7 +78,7 @@ in
     wantedBy = [ "gnome-session.target" ];
     before = [ "gnome-remote-desktop.service" ];
     unitConfig.ConditionPathExists = "%h/.config/remote-desktop/rdp-password";
-    path = [ pkgs.openssl pkgs.gnome-remote-desktop ];
+    path = [ pkgs.openssl pkgs.gnome-remote-desktop pkgs.libsecret ];
     serviceConfig = {
       Type = "oneshot";
       RemainAfterExit = true;
@@ -91,7 +98,19 @@ in
       grdctl rdp set-port ${toString port}
       grdctl rdp disable-port-negotiation
       grdctl rdp disable-view-only
-      grdctl rdp set-credentials "$USER" "$(< "$HOME/.config/remote-desktop/rdp-password")"
+      # The item's secret is the GVariant text grdctl itself would store.
+      gvariant_string() {
+        local s=''${1//\\/\\\\}
+        s=''${s//\'/\\\'}
+        printf "'%s'" "$s"
+      }
+      schema=org.gnome.RemoteDesktop.RdpCredentials
+      secret-tool clear xdg:schema "$schema" || true
+      printf "{'username': <%s>, 'password': <%s>}" \
+        "$(gvariant_string "$USER")" \
+        "$(gvariant_string "$(< "$HOME/.config/remote-desktop/rdp-password")")" |
+        secret-tool store --collection=session \
+          --label="GNOME Remote Desktop RDP credentials" xdg:schema "$schema"
       grdctl rdp enable
     '';
   };
