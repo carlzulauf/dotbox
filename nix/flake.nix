@@ -8,6 +8,11 @@
     #  as an escape hatch when an unstable pkg is broken
     nixpkgs-master.url = "github:NixOS/nixpkgs/master";
 
+    # Pinned to the last nixos-unstable with linux_testing at 7.4-rc1, for xps.
+    #  7.4-rc2 oopses probing its SoundWire sound card, which hangs suspend.
+    #  Pinned by rev, so `nix flake update` leaves it alone.
+    nixpkgs-xps-kernel.url = "github:NixOS/nixpkgs/f4a03c008967841f2a0b3cb7c436fc6fc31671f6";
+
     # used for better per-machine hardware support
     nixos-hardware.url = "github:NixOS/nixos-hardware/master";
     nixos-hardware.inputs.nixpkgs.follows = "nixpkgs";
@@ -44,6 +49,10 @@
   let
     specialArgs = attrs // {
       nixpkgs-master = import attrs.nixpkgs-master {
+        system = "x86_64-linux";
+        config.allowUnfree = true;
+      };
+      nixpkgs-xps-kernel = import attrs.nixpkgs-xps-kernel {
         system = "x86_64-linux";
         config.allowUnfree = true;
       };
