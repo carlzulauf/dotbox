@@ -100,6 +100,8 @@ in
     extest.enable = true;
   };
 
+  programs.obs-studio.enable = true;
+
   services.fwupd.enable = true;
 
   # Boot straight into a desktop so it can be reached over RDP without
