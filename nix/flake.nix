@@ -64,11 +64,11 @@
     );
     # Each machine's hardware-configuration.nix, checked in under hardware/ by
     # bin/install_nix. Hosts not checked in yet, and generic, use the one
-    # generated in /etc/nixos.
+    # generated in /etc/nixos, which needs --impure (install_nix adds it).
     hardwareConfig = host:
       if builtins.pathExists ./hardware/${host}.nix
       then ./hardware/${host}.nix
-      else ./hardware-configuration.nix;
+      else /etc/nixos/hardware-configuration.nix;
     # Public cert of each machine's puma-dev CA, generated in ~/.puma-dev-ssl
     # and checked in under puma-dev/ by bin/install_nix. The key stays on the
     # machine. builtins.path stores the cert on its own, so changes elsewhere in

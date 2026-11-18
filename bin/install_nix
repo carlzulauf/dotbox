@@ -1,8 +1,8 @@
 #!/usr/bin/env ruby
 
 # === NixOS Configuration Installer ===
-# Copies local NixOS configuration files to the system installation path
-# and optionally triggers a rebuild through nixos-rebuild.
+# Rebuilds NixOS straight from the flake in this checkout's nix/ directory,
+# after syncing the machine-local files the flake needs into it.
 #
 # Usage (from dotbox dir):
 #   bin/install_nix [options] [hostname]
@@ -19,8 +19,8 @@
 #                               SPEC must be attached (--gc=30d, -g+3); with no
 #                               SPEC, cleanup-nixos uses configurationLimit.
 #       --build-host=HOST       Remote builder for derivation evaluation.
-#                               Connects as the invoking user (no root login
-#                               needed); HOST just has to have that user in its
+#                               Connects as you (no root login needed); HOST
+#                               just has to have you in its
 #                               nix.settings.trusted-users.
 #       --nax                   Shorthand for --build-host=nax
 #       --hostname=NAME         Specify machine to build (default: `hostname`)
@@ -29,13 +29,12 @@
 #   -h, --help                  Show this help message
 #
 #
-# Configuration:
-#   Config files are read from dotbox's `nix/`` directory.
-#   Installs nix configs to /etc/nixos (requires sudo).
+# The flake only sees files git tracks, so new files under nix/ have to be
+# `git add`ed first. Files this script adds to nix/ are staged for you.
 #
 # Requirements:
 #   - ruby
-#   - rsync
+#   - git
 #   - nix (flake commands)
 #   - sudo access
 #   - cleanup-nixos (home/.local/bin), only when --gc is used
@@ -46,7 +45,6 @@ require 'optparse'
 class Script
   def self.default_options
     {
-      use_sudo:     true,
       upgrade:      false,
       rebuild:      false,
       gc:           nil,
@@ -54,7 +52,6 @@ class Script
       max_jobs:     nil,
       cores:        nil,
       rebuild_type: "boot",
-      install_path: "/etc/nixos",
       host:         default_host,
       config_dir:   dotbox_config_dir
     }
@@ -108,12 +105,11 @@ class Script
       sync_hardware_config,
       sync_puma_dev_ca,
       update_packages,
-      copy_nix_files,
       nixos_rebuild,
       collect_garbage
     ].reduce(:+)
     print_plan(commands)
-    keep_sudo_alive if use_sudo
+    keep_sudo_alive if rebuild
     commands.each { |command| run(command) }
     print_manual_steps unless rebuild
   end
@@ -137,9 +133,10 @@ class Script
     puts command.notice if command.notice
   end
 
-  # Prompt for sudo once up front (or not at all if the ticket is still fresh),
-  # then keep refreshing the ticket in the background so that later sudo calls
-  # -- notably nixos-rebuild's activation after a long build -- never re-prompt.
+  # Builds run as you, and only activation needs root. Prompt for sudo once up
+  # front (or not at all if the ticket is still fresh), then keep refreshing
+  # the ticket in the background so that the sudo for activation after a long
+  # build never re-prompts.
   # `sudo -n -v` never prompts; it just extends the existing ticket.
   def keep_sudo_alive
     run command("--validate", sudo: true)
@@ -154,29 +151,43 @@ class Script
 
   # Each machine's hardware-configuration.nix is generated in /etc/nixos and
   # checked into the repo as nix/hardware/<host>.nix, which the flake builds
-  # with. The /etc/nixos copy wins: it replaces the repo copy when that is
-  # missing or different, and is restored from the repo when it is missing.
-  # Only done for the machine being installed on, and never for generic, which
-  # is installed on whatever hardware is at hand.
+  # with. The /etc/nixos copy wins, and replaces the repo copy when that is
+  # missing or different. Only done for the machine being installed on, and
+  # never for generic, which is installed on whatever hardware is at hand.
   def sync_hardware_config
     return [] if host != self.class.default_host || host == "generic"
 
-    installed = File.join(install_path, "hardware-configuration.nix")
-    tracked = File.join(config_dir, "hardware", "#{host}.nix")
+    installed = "/etc/nixos/hardware-configuration.nix"
+    return [] unless File.exist?(installed)
+    return [] if File.exist?(hardware_config) && FileUtils.compare_file(installed, hardware_config)
 
-    if File.exist?(installed)
-      return [] if File.exist?(tracked) && FileUtils.compare_file(installed, tracked)
+    track(installed, hardware_config)
+  end
 
-      tracked_dir = File.dirname(tracked)
-      [
-        *(File.directory?(tracked_dir) ? [] : [command("mkdir", "-p", tracked_dir)]),
-        command("cp", installed, tracked, notice: "Updated #{tracked} from #{installed}; commit it to the repo."),
-      ]
-    elsif File.exist?(tracked)
-      [command("cp", tracked, installed, sudo: use_sudo)]
-    else
-      []
-    end
+  def hardware_config
+    File.join(config_dir, "hardware", "#{host}.nix")
+  end
+
+  # Hosts without a checked-in hardware config (generic, or another machine's
+  # not checked in yet) build with /etc/nixos/hardware-configuration.nix,
+  # which pure evaluation can't read.
+  def impure?
+    !File.exist?(hardware_config) && sync_hardware_config.empty?
+  end
+
+  # Copy a machine-local file into the repo, and stage it when it is new, so
+  # the flake can see it.
+  def track(source, tracked)
+    tracked_dir = File.dirname(tracked)
+    [
+      *(File.directory?(tracked_dir) ? [] : [command("mkdir", "-p", tracked_dir)]),
+      command("cp", source, tracked, notice: "Updated #{tracked} from #{source}; commit it to the repo."),
+      *(git_tracked?(tracked) ? [] : [command("git", "-C", config_dir, "add", tracked)]),
+    ]
+  end
+
+  def git_tracked?(path)
+    system("git", "-C", config_dir, "ls-files", "--error-unmatch", path, out: File::NULL, err: File::NULL)
   end
 
   # puma-dev's CA lives in ~/.puma-dev-ssl, generated on each machine by
@@ -195,19 +206,15 @@ class Script
     ssl_dir = File.expand_path("~/.puma-dev-ssl")
     cert = File.join(ssl_dir, "cert.pem")
     tracked = File.join(config_dir, "puma-dev", "#{host}.pem")
-    copy = command("cp", cert, tracked, notice: "Updated #{tracked} from #{cert}; commit it to the repo.")
-    tracked_dir = File.dirname(tracked)
-    mkdir = File.directory?(tracked_dir) ? [] : [command("mkdir", "-p", tracked_dir)]
 
     if puma_dev_ca_usable?(ssl_dir)
       return [] if File.exist?(tracked) && FileUtils.compare_file(cert, tracked)
 
-      [*mkdir, copy]
+      track(cert, tracked)
     else
       [
         command(File.expand_path("puma_dev_ca", __dir__), "--force", ssl_dir, host),
-        *mkdir,
-        copy,
+        *track(cert, tracked),
       ]
     end
   end
@@ -226,9 +233,9 @@ class Script
     cert.subject.to_s != "/CN=puma-dev CA" && cert.check_private_key(key)
   end
 
-  # Bump the packages in nix/pkgs before they are copied to install_path. Like
-  # the flake update, this only runs with a rebuild, so every bump gets built
-  # (a failed build leaves the bump in the repo, to fix or revert).
+  # Bump the packages in nix/pkgs before the rebuild. Like the flake update,
+  # this only runs with a rebuild, so every bump gets built (a failed build
+  # leaves the bump in the repo, to fix or revert).
   def update_packages
     return [] unless rebuild && upgrade
 
@@ -242,65 +249,32 @@ class Script
     end
   end
 
-  # Mirror the whole nix/ tree, deleting anything in install_path that is no
-  # longer in the repo, so renamed or removed files don't linger there.
-  # hardware-configuration.nix is generated on each machine and isn't in nix/,
-  # so it is excluded to keep --delete from removing it.
-  def copy_nix_files
-    [
-      command(
-        "rsync", "--archive", "--delete",
-        "--exclude=/hardware-configuration.nix",
-        *(use_sudo ? ["--chown=root:root"] : []),
-        "#{config_dir}/",
-        "#{install_path}/",
-        sudo: use_sudo
-      )
-    ]
-  end
-
-  # `sudo nixos-rebuild` causes --build-host to ssh as root, which means /root
-  # has to have ssh keys accepted by root@{build-host}, which is not ideal.
-  #
-  # When --build-host is present, we now run the command without sudo, but
-  # with --elevate=sudo, so `nixos-rebuild` prefixes only its local activation
-  # commands with sudo. That sudo reuses the ticket kept fresh by
-  # keep_sudo_alive, so it doesn't prompt again. (--ask-elevate-password is
-  # avoided because it always prompts and bypasses the ticket.) The ssh to the
-  # build-host happens as the current user, and the build host will still build
-  # to its store if the user is in nix.settings.trusted-users
-  def delegate_elevation?
-    !build_host.nil? && use_sudo
-  end
-
   def nixos_rebuild
     return [] unless rebuild
 
     [
-      # An update that isn't built would never be copied back to the repo, and
-      # the next install would overwrite it, so it only runs with a rebuild.
+      # Only updated with a rebuild, so every update gets built.
       *(upgrade ? [flake_update_command] : []),
       rebuild_command,
-      # capture the successful lock file if we get this far
-      copy_lock_file,
     ]
   end
 
   def flake_update_command
-    command("nix", "flake", "update", "--flake", install_path, sudo: use_sudo)
+    command("nix", "flake", "update", "--flake", config_dir)
   end
 
+  # Runs as you, so the flake is evaluated by its owner (git refuses a repo
+  # owned by someone else) and a --build-host is reached over your ssh, not
+  # root's. --elevate=sudo has nixos-rebuild sudo only for activation, reusing
+  # the ticket kept fresh by keep_sudo_alive. The build host only has to have
+  # you in its nix.settings.trusted-users.
   def rebuild_command
-    cmd_options = ["--log-format", "bar-with-logs", "--flake", "/etc/nixos##{host}"]
+    cmd_options = ["--log-format", "bar-with-logs", "--flake", "#{config_dir}##{host}", "--elevate=sudo"]
+    cmd_options << "--impure" if impure?
     cmd_options << "--build-host" << build_host if build_host
     cmd_options << "--max-jobs" << max_jobs.to_s if max_jobs
     cmd_options << "--cores" << cores.to_s if cores
-    cmd_options << "--elevate=sudo" if delegate_elevation?
-    command("nixos-rebuild", *cmd_options, rebuild_type, sudo: use_sudo && !delegate_elevation?)
-  end
-
-  def copy_lock_file
-    command("cp", File.join(install_path, "flake.lock"), File.join(config_dir, "flake.lock"))
+    command("nixos-rebuild", *cmd_options, rebuild_type)
   end
 
   # Without a rebuild, show the commands that would have followed instead.

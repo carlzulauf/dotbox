@@ -17,29 +17,16 @@ Provides a guide to agents or others for working in this repo.
 
 ## The Two Install Scripts
 
-### `bin/install_nix` — NixOS Config Deployment
+### `bin/install_nix` — NixOS Rebuilds
 
-**Purpose**: Copy local NixOS configuration from `nix/` into `/etc/nixos`, then
-optionally rebuild the system.
+Rebuilds the machine straight from the flake in `nix/`. The flake only sees git-tracked files, so `git add` new files.
 
-**Critical detail**: This script does **not** run `nix build`, `nix flake`, or
-`nixos-rebuild` directly from the source tree. It **copies** files to
-`/etc/nixos` first, then runs `nixos-rebuild` from there. This is because
-NixOS's `nixos-rebuild` expects its config at `/etc/nixos/` by default.
-
-Before copying, it syncs the machine's `/etc/nixos/hardware-configuration.nix`
-with `nix/hardware/<host>.nix`: the `/etc/nixos` copy replaces the repo copy
-when that is missing or different, and is restored from the repo when it is
-missing. The flake builds with the repo copy when there is one.
-
-For machines whose config enables `services.puma-dev`, it also syncs the
-puma-dev CA. The CA's key lives only in `~/.puma-dev-ssl/` on that machine and
-never enters the Nix store; `bin/puma_dev_ca` generates it when it is missing,
-mismatched, or the old store-generated `CN=puma-dev CA`. Its public cert is
-copied to `nix/puma-dev/<host>.pem`, which the flake trusts system-wide. Commit
-that file when it changes.
-
----
+It first syncs two machine-local files into the repo, which the flake builds
+with: `/etc/nixos/hardware-configuration.nix` to `nix/hardware/<host>.nix`,
+and, where `services.puma-dev` is enabled, the public cert of the puma-dev CA
+in `~/.puma-dev-ssl/` (made by `bin/puma_dev_ca`) to `nix/puma-dev/<host>.pem`.
+Commit them when they change. Hosts without a hardware file build with
+`--impure`.
 
 ### `bin/install_dotfiles` — Home Directory Setup
 
@@ -49,10 +36,3 @@ private directories) into the user's `$HOME`.
 **Key design**: Layered installation with "last-write-wins" semantics. Base
 dotfiles come from `home/` and `home-files/`, then private directories are
 layered on top.
-
-## Common Pitfalls
-
-1. **Running Nix commands from the repo checkout**: `nixos-rebuild`,
-   `nix build .#`, `nix flake update` — these will **not work** unless you
-   first copy configs to `/etc/nixos`. Always use `bin/install_nix` or manually
-   replicate the copy step.

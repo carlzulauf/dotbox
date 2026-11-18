@@ -8,7 +8,7 @@ This repository manages infrastructure for multiple NixOS systems (desktops, lap
 *   **`flake.nix`**: The entry point defining all outputs. It generates a configuration for every `machines/{hostname}.nix`.
 *   **`configuration.nix`**: Base Nix settings applied to all hosts (the extra cache.numtide.com binary cache).
 *   **`machines/`**: Contains host-specific configurations (`{hostname}.nix`). These files handle hardware-specific drivers, storage mounts, service toggles, and each host's `system.stateVersion`.
-*   **`hardware/`**: Each host's generated `hardware-configuration.nix`, as `{hostname}.nix`. `bin/install_nix` checks these in from `/etc/nixos`; hosts without one (and `generic`) build with `/etc/nixos/hardware-configuration.nix`.
+*   **`hardware/`**: Each host's generated `hardware-configuration.nix`, as `{hostname}.nix`. `bin/install_nix` checks these in from `/etc/nixos`; hosts without one (and `generic`) build with `/etc/nixos/hardware-configuration.nix`, which needs `--impure`.
 *   **`includes/`**: Reusable modules for shared features:
     *   `defaults.nix`: Global settings (fish shell, network-manager, nix-ld, tailscale, openssh).
     *   `carl.nix`: User account setup and service credentials (Syncthing, etc.).
@@ -17,12 +17,10 @@ This repository manages infrastructure for multiple NixOS systems (desktops, lap
     *   `niri-dms.nix`: Standalone niri desktop riced with DankMaterialShell (bar, launcher, notifications, lock, theming) and its greetd greeter. Used by nirvm.
 
 ### The Installer (`bin/install_nix`)
-The script `bin/install_nix` automates the deployment process:
-1.  Syncs this machine's `/etc/nixos/hardware-configuration.nix` with `hardware/{hostname}.nix`. The `/etc/nixos` copy replaces the repo copy when that is missing or different (commit the result), and is restored from the repo when it is missing.
-2.  Mirrors the whole `nix/` directory to `/etc/nixos`, deleting files that are no longer in the repo (except `hardware-configuration.nix`).
-3.  With `--upgrade`, updates every flake input via `nix flake update`.
-4.  Triggers the rebuild using `nixos-rebuild` (in switch or boot mode). `--no-rebuild` skips the update and rebuild, whatever else is passed.
-5.  Syncs the resulting `flake.lock` back to the config directory for version control stability.
+The script `bin/install_nix` rebuilds straight from this directory (the flake only sees git-tracked files, so `git add` new ones):
+1.  Copies this machine's `/etc/nixos/hardware-configuration.nix` to `hardware/{hostname}.nix` when that is missing or different (commit the result), and the same for its puma-dev CA cert in `puma-dev/`.
+2.  With `--upgrade`, updates every flake input via `nix flake update`, writing `flake.lock` here.
+3.  Triggers the rebuild using `nixos-rebuild` (in switch or boot mode), as you, with sudo only for activation. `--no-rebuild` skips the update and rebuild, whatever else is passed.
 
 ## 🖥️ Supported Hosts
 
@@ -49,7 +47,7 @@ The `flake.nix` defines a system for each file in `machines/`:
 To deploy the system configuration to a target machine:
 
 ```bash
-# 1. Copy configs (dry run - prints commands)
+# 1. Sync machine-local files (dry run - prints the rebuild commands)
 bin/install_nix
 
 # 2. Switch immediately to this generation
