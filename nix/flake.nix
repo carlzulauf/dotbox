@@ -57,19 +57,11 @@
         config.allowUnfree = true;
       };
     };
-    activeHosts = [
-      "generic" # Base host for initial installs (no hardware-specific config)
-      "frix" # Framework Desktop
-      "enix" # HP Envy Laptop
-      "khoa" # torrent station
-      "nax"  # NAS
-      "nixd" # Custom Desktop
-      "nirvm" # niri VM (libvirt guest, see bin/nirvm)
-      "obak" # Offsite Backup
-      "phx"  # GPD WinMax
-      "xps"  # Work XPS
-      "xtv"  # TV Gaming
-    ];
+    # Every machines/<host>.nix is a host. See nix/README.md for what each is.
+    hosts = map (nixpkgs.lib.removeSuffix ".nix") (
+      builtins.filter (nixpkgs.lib.hasSuffix ".nix")
+        (builtins.attrNames (builtins.readDir ./machines))
+    );
     # Each machine's hardware-configuration.nix, checked in under hardware/ by
     # bin/install_nix. Hosts not checked in yet, and generic, use the one
     # generated in /etc/nixos.
@@ -108,7 +100,7 @@
     };
   in
   {
-    nixosConfigurations = nixpkgs.lib.genAttrs activeHosts mkHost // {
+    nixosConfigurations = nixpkgs.lib.genAttrs hosts mkHost // {
       iso = mkIso;
     };
   };

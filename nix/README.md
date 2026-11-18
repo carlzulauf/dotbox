@@ -5,7 +5,7 @@ This repository manages infrastructure for multiple NixOS systems (desktops, lap
 ## 🏗️ Architecture
 
 ### Directory Structure (`nix/`)
-*   **`flake.nix`**: The entry point defining all outputs. It iterates over the `activeHosts` list to generate configurations for each machine.
+*   **`flake.nix`**: The entry point defining all outputs. It generates a configuration for every `machines/{hostname}.nix`.
 *   **`configuration.nix`**: Base Nix settings applied to all hosts (the extra cache.numtide.com binary cache).
 *   **`machines/`**: Contains host-specific configurations (`{hostname}.nix`). These files handle hardware-specific drivers, storage mounts, service toggles, and each host's `system.stateVersion`.
 *   **`hardware/`**: Each host's generated `hardware-configuration.nix`, as `{hostname}.nix`. `bin/install_nix` checks these in from `/etc/nixos`; hosts without one (and `generic`) build with `/etc/nixos/hardware-configuration.nix`.
@@ -26,10 +26,11 @@ The script `bin/install_nix` automates the deployment process:
 
 ## 🖥️ Supported Hosts
 
-The `flake.nix` defines the following active systems:
+The `flake.nix` defines a system for each file in `machines/`:
 
 | Host | Description | Key Config Notes |
 | :--- | :--- | :--- |
+| **generic** | Base host for initial installs | No hardware-specific config. |
 | **frix** | Framework Desktop (AMD Ryzen 9) | ds4 + Ollama, switchable ROCm/Vulkan backends; GNOME + COSMIC. |
 | **enix** | HP Envy Laptop | |
 | **khoa** | Torrent Station | |
