@@ -26,7 +26,7 @@
 #
 # 2. A store path in the RUNPATH was garbage collected. Extensions record the
 #    exact /nix/store paths they were built against -- glibc, gcc, libyaml,
-#    libpq, whatever the gem links. `cleanup-nixos` (or any nix-collect-garbage)
+#    libpq, whatever the gem links. `nh clean` (or any nix-collect-garbage)
 #    deletes those once no generation references them, and the .so is then
 #    unloadable even though Ruby itself never changed. This is why gems rot
 #    after a big nixpkgs update that had nothing to do with Ruby.

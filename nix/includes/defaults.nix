@@ -226,6 +226,13 @@ in
     programs.nh = {
       enable = true;
       flake = "/home/carl/projects/dotbox/nix";
+      # Weekly `nh clean all`. Keeping at least as many generations as the
+      # boot loader has entries for means none of them are deleted out from
+      # under it (see --gc in bin/install_nix).
+      clean = {
+        enable = true;
+        extraArgs = "--keep ${toString config.boot.loader.systemd-boot.configurationLimit} --keep-since 7d";
+      };
     };
 
     services.tailscale = {

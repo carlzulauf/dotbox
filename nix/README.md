@@ -21,6 +21,8 @@ The script `bin/install_nix` rebuilds straight from this directory (the flake on
 1.  Copies this machine's `/etc/nixos/hardware-configuration.nix` to `hardware/{hostname}.nix` when that is missing or different (commit the result), and the same for its puma-dev CA cert in `puma-dev/`.
 2.  Rebuilds with [nh](https://github.com/nix-community/nh) (`nh os switch` or `nh os boot`), as you, with sudo only for activation. With `--upgrade` it passes `--update`, so nh updates every flake input in `flake.lock` here first. `--no-rebuild` skips the update and rebuild, whatever else is passed.
 
+3.  With `--gc`, runs `nh clean all` afterwards, keeping the host's `configurationLimit` generations (or `--gc=N` / `--gc=30d`; a tighter trim reinstalls the boot loader so no stale entries are left). A weekly `nh clean` timer does the same on every host.
+
 Every command is printed before it runs. `programs.nh.flake` points at this directory, so plain `nh os switch` works too.
 
 ## 🖥️ Supported Hosts
@@ -68,7 +70,7 @@ bin/install_nix --nax   # Shorthand for --build-host nax
 ### Managing Packages & Environment
 The configuration unifies the environment across all hosts via `environment.systemPackages`; dotfiles are managed by `bin/install_dotfiles` from `home/` and `home-files/` rather than Home Manager.
 *   **Default Shell**: Fish is set globally.
-*   **Nix Store**: Auto-optimisation and binary substituters (cache.numtide) are enabled by default.
+*   **Nix Store**: Auto-optimisation, a weekly `nh clean`, and binary substituters (cache.numtide) are enabled by default.
 *   **Development**: Ruby, Node.js, Python, SQLite, and Terraform are pre-bundled in system packages (`includes/defaults.nix`).
 
 ## 💡 Configuration Tips

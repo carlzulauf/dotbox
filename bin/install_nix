@@ -16,9 +16,11 @@
 #   -r, --rebuild               Rebuild after syncing files
 #       --no-rebuild            Disable rebuild, and the flake update with it
 #                               (wins over every other option, in any order)
-#   -g, --gc[=SPEC]             Run cleanup-nixos after a successful rebuild.
-#                               SPEC must be attached (--gc=30d, -g+3); with no
-#                               SPEC, cleanup-nixos uses configurationLimit.
+#   -g, --gc[=SPEC]             Run `nh clean all` after a successful rebuild.
+#                               SPEC is generations to keep (-g5, --gc=+5) or
+#                               how long to keep them (--gc=30d), and must be
+#                               attached; with no SPEC it keeps the host's
+#                               configurationLimit.
 #       --build-host=HOST       Remote builder for derivation evaluation.
 #                               Connects as you (no root login needed); HOST
 #                               just has to have you in its
@@ -39,7 +41,6 @@
 #   - nix (flake commands)
 #   - nh (run from nixpkgs when it isn't installed yet)
 #   - sudo access
-#   - cleanup-nixos (home/.local/bin), only when --gc is used
 
 require 'fileutils'
 require 'optparse'
@@ -71,12 +72,6 @@ class Script
   # script to bump it, run by --upgrade.
   def self.updatable_packages
     %w[t3code-desktop open-vsx-extensions]
-  end
-
-  # Prefer the copy in this repo so --gc works before dotfiles are installed.
-  def self.cleanup_nixos_bin
-    local = File.expand_path(File.join(File.dirname(__FILE__), "..", "home", ".local", "bin", "cleanup-nixos"))
-    File.exist?(local) ? local : "cleanup-nixos"
   end
 
   def self.start(argv)
@@ -291,30 +286,52 @@ class Script
     package_update_commands.each { |cmd| puts "Update package: #{prompt.(cmd)}" }
     puts "Rebuild NixOS: #{prompt.(rebuild_command)}"
     puts "Update flake and rebuild: #{prompt.(rebuild_command(update: true))}"
-    puts "Collect garbage: $ #{garbage_command.argv.join(' ')}" unless gc.nil?
+    garbage_commands.each { |cmd| puts "Collect garbage: #{prompt.(cmd)}" } unless gc.nil?
   end
 
-  # Runs last: the rebuild has already added a generation, so trimming to the
-  # newest N here leaves exactly N with boot entries. cleanup-nixos sudos itself.
+  # Runs last: the rebuild has already added a generation, so keeping the
+  # newest N here leaves exactly N with boot entries. nh sudos itself.
   #
   # That rebuild also left the ESP holding exactly configurationLimit entries,
-  # which is what a bare --gc trims to -- so the generations it deletes have no
-  # entries left to strand. Anything else (a tighter SPEC, or no rebuild at all)
-  # can strand them, and needs cleanup-nixos to reinstall the boot loader.
+  # which is what a bare --gc keeps -- so the generations it deletes have no
+  # entries left to strand. Anything else (a tighter SPEC, or no rebuild at
+  # all) can strand entries, which boot and then panic in stage 2 on an init=
+  # path that no longer exists, so the boot loader is reinstalled to drop them.
   def collect_garbage
     return [] if gc.nil? || !rebuild
 
-    [garbage_command]
+    garbage_commands
   end
 
-  def garbage_command
+  # GC roots (result links, direnv shells) are left alone, like
+  # nix-collect-garbage does; the weekly nh-clean timer prunes ones over a week
+  # old.
+  def garbage_commands
     reconciled = rebuild && gc == :auto
-    command(*[
-      self.class.cleanup_nixos_bin,
-      "--summary",
-      reconciled ? nil : "--boot-sync",
-      gc == :auto ? nil : gc,
-    ].compact)
+    [
+      command(*nh, "clean", "all", "--no-gcroots", *keep_options),
+      *(reconciled ? [] : [command("/nix/var/nix/profiles/system/bin/switch-to-configuration", "boot", sudo: true)]),
+    ]
+  end
+
+  def keep_options
+    case gc
+    when :auto then ["--keep", configuration_limit]
+    when /\A\+?(\d+)\z/ then ["--keep", $1]
+    else ["--keep-since", gc]
+    end
+  end
+
+  # Read from the configuration being built, which is what the boot loader
+  # is installed with.
+  def configuration_limit
+    @configuration_limit ||= begin
+      attr = "#{config_dir}#nixosConfigurations.#{host}.config.boot.loader.systemd-boot.configurationLimit"
+      limit = IO.popen(["nix", "eval", "--json", *(impure? ? ["--impure"] : []), attr], err: File::NULL, &:read).strip
+      abort "Couldn't read configurationLimit for #{host} (got #{limit.inspect}); pass --gc=SPEC." unless limit.match?(/\A[1-9]\d*\z/)
+
+      limit
+    end
   end
 
   def parse_options(argv)
@@ -336,8 +353,8 @@ class Script
           no_rebuild = true
         end
 
-        # SPEC must be attached (--gc=30d, -g+3); bare --gc defers to configurationLimit.
-        op.on("--gc[=SPEC]", "-g", "Run cleanup-nixos after a successful rebuild. Defaults to configurationLimit.") do |spec|
+        # SPEC must be attached (--gc=30d, -g+3); bare --gc keeps configurationLimit.
+        op.on("--gc[=SPEC]", "-g", "Run `nh clean all` after a successful rebuild. Keeps configurationLimit generations by default.") do |spec|
           parsed[:gc] = spec || :auto
         end
 
