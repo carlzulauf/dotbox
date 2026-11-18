@@ -1,0 +1,21 @@
+# Upstream releases pinned by nvfetcher, which writes their versions and
+# hashes to _sources/. Bump them all with `nix run nixpkgs#nvfetcher` (from
+# this directory), which bin/install_nix --update runs.
+
+# T3 Code desktop AppImage (t3code-desktop/), from its latest GitHub release.
+[t3code-desktop]
+src.github = "pingdotgg/t3code"
+src.prefix = "v"
+fetch.url = "https://github.com/pingdotgg/t3code/releases/download/v$ver/T3-Code-x86_64.AppImage"
+
+# VSCodium extensions nixpkgs doesn't package (open-vsx-extensions/). Every
+# entry with a publisher is one of them.
+[vscode-toggle-quotes]
+src.openvsx = "britesnow.vscode-toggle-quotes"
+fetch.openvsx = "britesnow.vscode-toggle-quotes"
+passthru = { publisher = "britesnow", extName = "vscode-toggle-quotes" }
+
+[haml-hero]
+src.openvsx = "XanderDoom.haml-hero"
+fetch.openvsx = "XanderDoom.haml-hero"
+passthru = { publisher = "XanderDoom", extName = "haml-hero" }

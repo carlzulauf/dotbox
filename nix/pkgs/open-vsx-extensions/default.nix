@@ -1,25 +1,25 @@
 # VSCodium extensions that nixpkgs doesn't package, pinned as .vsix files
 # straight from Open VSX (the marketplace VSCodium itself uses).
 #
-# Each entry in extensions.json is one extension. To add one, append an entry
-# with any version and an empty hash, then run ./update to fill both in.
-# ./update bumps every entry to its latest release, using the sha256 Open VSX
-# publishes alongside each .vsix (no download needed).
+# Every nvfetcher source with a publisher (../nvfetcher.toml) is one. To add
+# one, add an entry there like the others and run `nix run nixpkgs#nvfetcher`
+# in nix/pkgs, which also bumps them all to their latest releases.
 {
   lib,
   vscode-utils,
-  fetchurl,
+  callPackage,
+  unzip,
 }:
 
 map (
   ext:
   vscode-utils.buildVscodeMarketplaceExtension {
     mktplcRef = {
-      inherit (ext) publisher name version;
+      inherit (ext) publisher version;
+      name = ext.extName;
     };
-    vsix = fetchurl {
-      url = "https://open-vsx.org/api/${ext.publisher}/${ext.name}/${ext.version}/file/${ext.publisher}.${ext.name}-${ext.version}.vsix";
-      inherit (ext) hash;
-    };
+    vsix = ext.src;
+    # nvfetcher names the download .zip, which the .vsix unpacker skips.
+    nativeBuildInputs = [ unzip ];
   }
-) (lib.importJSON ./extensions.json)
+) (lib.filter (source: source ? publisher) (lib.attrValues (callPackage ../_sources/generated.nix { })))

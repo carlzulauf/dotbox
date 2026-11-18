@@ -11,7 +11,7 @@
 # Options:
 #   -s, --switch                Rebuild in 'switch' mode (active immediately)
 #   -b, --boot                  Rebuild in 'boot' mode (active next boot)
-#   -u, --upgrade, --update     Bump nix/pkgs with update scripts, update
+#   -u, --upgrade, --update     Bump nix/pkgs with nvfetcher, update
 #                               flake.lock, and rebuild
 #   -r, --rebuild               Rebuild after syncing files
 #       --no-rebuild            Disable rebuild, and the flake update with it
@@ -66,12 +66,6 @@ class Script
 
   def self.default_host
     `hostname`.strip
-  end
-
-  # Packages in nix/pkgs that pin an upstream release and have an `update`
-  # script to bump it, run by --upgrade.
-  def self.updatable_packages
-    %w[t3code-desktop open-vsx-extensions]
   end
 
   def self.start(argv)
@@ -230,20 +224,23 @@ class Script
     cert.subject.to_s != "/CN=puma-dev CA" && cert.check_private_key(key)
   end
 
-  # Bump the packages in nix/pkgs before the rebuild. Like the flake update,
+  # Bump the upstream releases nix/pkgs pins (nvfetcher.toml) before the
+  # rebuild. Like the flake update,
   # this only runs with a rebuild, so every bump gets built (a failed build
   # leaves the bump in the repo, to fix or revert).
   def update_packages
     return [] unless rebuild && upgrade
 
-    package_update_commands
+    [package_update_command]
   end
 
-  # The scripts rewrite their package's files in config_dir, so no sudo.
-  def package_update_commands
-    self.class.updatable_packages.map do |package|
-      command(File.join(config_dir, "pkgs", package, "update"))
-    end
+  def package_update_command
+    pkgs = File.join(config_dir, "pkgs")
+    command(
+      "nix", "run", "nixpkgs#nvfetcher", "--",
+      "--config", File.join(pkgs, "nvfetcher.toml"),
+      "--build-dir", File.join(pkgs, "_sources")
+    )
   end
 
   def nixos_rebuild
@@ -283,7 +280,7 @@ class Script
   # Without a rebuild, show the commands that would have followed instead.
   def print_manual_steps
     prompt = ->(cmd) { "#{cmd.sudo ? '#' : '$'} #{cmd.argv.join(' ')}" }
-    package_update_commands.each { |cmd| puts "Update package: #{prompt.(cmd)}" }
+    puts "Update packages: #{prompt.(package_update_command)}"
     puts "Rebuild NixOS: #{prompt.(rebuild_command)}"
     puts "Update flake and rebuild: #{prompt.(rebuild_command(update: true))}"
     garbage_commands.each { |cmd| puts "Collect garbage: #{prompt.(cmd)}" } unless gc.nil?
@@ -339,7 +336,7 @@ class Script
 
     {}.tap do |parsed|
       remainders = OptionParser.new do |op|
-        op.on("--upgrade", "--update", "-u", "Upgrade: bump nix/pkgs with update scripts, update every input in flake.lock, then rebuild") do
+        op.on("--upgrade", "--update", "-u", "Upgrade: bump nix/pkgs with nvfetcher, update every input in flake.lock, then rebuild") do
           parsed[:upgrade] = true
           parsed[:rebuild] = true
         end

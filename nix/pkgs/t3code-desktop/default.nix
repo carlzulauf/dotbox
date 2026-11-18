@@ -4,8 +4,8 @@
 # Electron, so they trail upstream's releases. This runs the official
 # AppImage instead, in the same FHS sandbox `appimage-run` uses.
 #
-# Bump with ./update, which reads the version, AppImage name and sha512 from
-# the release's latest-linux.yml (no download needed).
+# Its version and hash are pinned by nvfetcher (../nvfetcher.toml); bump with
+# `nix run nixpkgs#nvfetcher` in nix/pkgs.
 #
 # The desktop app starts its own backend on ~/.t3/userdata, so don't run it
 # on a host that also runs a T3 Code server on the same home directory.
@@ -17,21 +17,12 @@
 {
   lib,
   appimageTools,
-  fetchurl,
+  callPackage,
   makeWrapper,
 }:
 
 let
-  pname = "t3code-desktop";
-  version = "0.1.10";
-  # Upstream dropped the version from this name in 0.1.10; ./update copies
-  # it from the release manifest.
-  appimage = "T3-Code-x86_64.AppImage";
-
-  src = fetchurl {
-    url = "https://github.com/pingdotgg/t3code/releases/download/v${version}/${appimage}";
-    hash = "sha512-PG/6CQ2klc5ko7/xijF1OkqlRCrYpJcvlxRPmYdJ7Vbt3ZPMRqTWMvYCeRFMYtNU9LvP2jM7akNV7wOJ5qhymw==";
-  };
+  inherit ((callPackage ../_sources/generated.nix { }).t3code-desktop) pname version src;
 
   contents = appimageTools.extract { inherit pname version src; };
 in

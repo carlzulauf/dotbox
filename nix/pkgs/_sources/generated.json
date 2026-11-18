@@ -1,0 +1,53 @@
+{
+    "haml-hero": {
+        "cargoLock": null,
+        "date": null,
+        "extract": null,
+        "name": "haml-hero",
+        "passthru": {
+            "extName": "haml-hero",
+            "publisher": "XanderDoom"
+        },
+        "pinned": false,
+        "src": {
+            "name": "haml-hero-1.0.1.zip",
+            "sha256": "sha256-nxTRSi/R1SGx+rQ2fgfbqGDvy4EKXDAMJREkPxetlWQ=",
+            "type": "url",
+            "url": "https://open-vsx.org/api/XanderDoom/haml-hero/1.0.1/file/XanderDoom.haml-hero-1.0.1.vsix"
+        },
+        "version": "1.0.1"
+    },
+    "t3code-desktop": {
+        "cargoLock": null,
+        "date": null,
+        "extract": null,
+        "name": "t3code-desktop",
+        "passthru": null,
+        "pinned": false,
+        "src": {
+            "name": null,
+            "sha256": "sha256-fN7RPBB1cVOQHt3ayaJgixVvF0Rd5Qbvn/33PAFSjXk=",
+            "type": "url",
+            "url": "https://github.com/pingdotgg/t3code/releases/download/v0.1.10/T3-Code-x86_64.AppImage"
+        },
+        "version": "0.1.10"
+    },
+    "vscode-toggle-quotes": {
+        "cargoLock": null,
+        "date": null,
+        "extract": null,
+        "name": "vscode-toggle-quotes",
+        "passthru": {
+            "extName": "vscode-toggle-quotes",
+            "publisher": "britesnow"
+        },
+        "pinned": false,
+        "src": {
+            "name": "vscode-toggle-quotes-0.3.6.zip",
+            "sha256": "sha256-FNn82+YOUpYb/wABL79HUx1/LN9GJAYBUKYmz4O0Er8=",
+            "type": "url",
+            "url": "https://open-vsx.org/api/britesnow/vscode-toggle-quotes/0.3.6/file/britesnow.vscode-toggle-quotes-0.3.6.vsix"
+        },
+        "version": "0.3.6"
+    }
+}
