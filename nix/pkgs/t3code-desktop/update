@@ -1,9 +1,9 @@
 #!/usr/bin/env ruby
 
 # === Bump nix/pkgs/t3code-desktop to a T3 Code release ===
-# Reads the version and AppImage sha512 from the release's latest-linux.yml
-# (electron-builder's update manifest), so nothing large is downloaded, and
-# rewrites them in default.nix.
+# Reads the version, AppImage name and sha512 from the release's
+# latest-linux.yml (electron-builder's update manifest), so nothing large is
+# downloaded, and rewrites them in default.nix.
 #
 # Usage:
 #   nix/pkgs/t3code-desktop/update            # latest stable release
@@ -35,15 +35,18 @@ manifest =
 version = manifest.fetch("version")
 appimage = manifest.fetch("files").find { |f| f["url"].end_with?("-x86_64.AppImage") } or
   abort "No x86_64 AppImage in #{manifest_url}"
-expected_name = "T3-Code-#{version}-x86_64.AppImage"
-appimage["url"] == expected_name or
-  abort "Unexpected AppImage name #{appimage['url']} (default.nix builds #{expected_name})"
+# A bare file name next to the manifest in the release (0.1.10 dropped the
+# version from it, so default.nix takes the name as-is).
+name = appimage["url"]
+name.match?(/\A[\w.-]+\z/) or abort "Unexpected AppImage url #{name} in #{manifest_url}"
 hash = "sha512-#{appimage.fetch('sha512')}"
 
 nix = File.read(NIX_FILE)
 current = nix[/^  version = "([^"]+)";$/, 1] or abort "No version in #{NIX_FILE}"
 
-if current == version && nix.include?(%(hash = "#{hash}";))
+nix.match?(/^  appimage = "[^"]+";$/) or abort "No appimage in #{NIX_FILE}"
+
+if current == version && nix.include?(%(hash = "#{hash}";)) && nix.include?(%(appimage = "#{name}";))
   puts "t3code-desktop is already at #{version}"
   exit
 end
@@ -52,5 +55,6 @@ puts "t3code-desktop: #{current} -> #{version}"
 exit if check
 
 nix = nix.sub(/^  version = "[^"]+";$/) { %(  version = "#{version}";) }
+nix = nix.sub(/^  appimage = "[^"]+";$/) { %(  appimage = "#{name}";) }
 nix = nix.sub(/^    hash = "[^"]+";$/) { %(    hash = "#{hash}";) }
 File.write(NIX_FILE, nix)
