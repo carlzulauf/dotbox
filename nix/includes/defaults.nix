@@ -221,6 +221,13 @@ in
       };
     };
 
+    # nh: nicer nixos-rebuild (package diffs, nix-output-monitor), and what
+    # bin/install_nix rebuilds with. Plain `nh os switch` builds this repo.
+    programs.nh = {
+      enable = true;
+      flake = "/home/carl/projects/dotbox/nix";
+    };
+
     services.tailscale = {
       enable = true;
       useRoutingFeatures = "both";

@@ -19,8 +19,9 @@ This repository manages infrastructure for multiple NixOS systems (desktops, lap
 ### The Installer (`bin/install_nix`)
 The script `bin/install_nix` rebuilds straight from this directory (the flake only sees git-tracked files, so `git add` new ones):
 1.  Copies this machine's `/etc/nixos/hardware-configuration.nix` to `hardware/{hostname}.nix` when that is missing or different (commit the result), and the same for its puma-dev CA cert in `puma-dev/`.
-2.  With `--upgrade`, updates every flake input via `nix flake update`, writing `flake.lock` here.
-3.  Triggers the rebuild using `nixos-rebuild` (in switch or boot mode), as you, with sudo only for activation. `--no-rebuild` skips the update and rebuild, whatever else is passed.
+2.  Rebuilds with [nh](https://github.com/nix-community/nh) (`nh os switch` or `nh os boot`), as you, with sudo only for activation. With `--upgrade` it passes `--update`, so nh updates every flake input in `flake.lock` here first. `--no-rebuild` skips the update and rebuild, whatever else is passed.
+
+Every command is printed before it runs. `programs.nh.flake` points at this directory, so plain `nh os switch` works too.
 
 ## 🖥️ Supported Hosts
 

@@ -19,7 +19,9 @@ Provides a guide to agents or others for working in this repo.
 
 ### `bin/install_nix` — NixOS Rebuilds
 
-Rebuilds the machine straight from the flake in `nix/`. The flake only sees git-tracked files, so `git add` new files.
+Rebuilds the machine with `nh os boot|switch`, straight from the flake in
+`nix/` (plain `nh os switch` works too). The flake only sees git-tracked
+files, so `git add` new files.
 
 It first syncs two machine-local files into the repo, which the flake builds
 with: `/etc/nixos/hardware-configuration.nix` to `nix/hardware/<host>.nix`,

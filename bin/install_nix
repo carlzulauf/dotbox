@@ -1,8 +1,9 @@
 #!/usr/bin/env ruby
 
 # === NixOS Configuration Installer ===
-# Rebuilds NixOS straight from the flake in this checkout's nix/ directory,
-# after syncing the machine-local files the flake needs into it.
+# Rebuilds NixOS with nh, straight from the flake in this checkout's nix/
+# directory, after syncing the machine-local files the flake needs into it.
+# Every command is printed before it runs, so they can be run by hand too.
 #
 # Usage (from dotbox dir):
 #   bin/install_nix [options] [hostname]
@@ -12,7 +13,7 @@
 #   -b, --boot                  Rebuild in 'boot' mode (active next boot)
 #   -u, --upgrade, --update     Bump nix/pkgs with update scripts, update
 #                               flake.lock, and rebuild
-#   -r, --rebuild               Run nixos-rebuild after copying configs
+#   -r, --rebuild               Rebuild after syncing files
 #       --no-rebuild            Disable rebuild, and the flake update with it
 #                               (wins over every other option, in any order)
 #   -g, --gc[=SPEC]             Run cleanup-nixos after a successful rebuild.
@@ -36,6 +37,7 @@
 #   - ruby
 #   - git
 #   - nix (flake commands)
+#   - nh (run from nixpkgs when it isn't installed yet)
 #   - sudo access
 #   - cleanup-nixos (home/.local/bin), only when --gc is used
 
@@ -252,37 +254,43 @@ class Script
   def nixos_rebuild
     return [] unless rebuild
 
-    [
-      # Only updated with a rebuild, so every update gets built.
-      *(upgrade ? [flake_update_command] : []),
-      rebuild_command,
-    ]
+    [rebuild_command(update: upgrade)]
   end
 
-  def flake_update_command
-    command("nix", "flake", "update", "--flake", config_dir)
-  end
-
-  # Runs as you, so the flake is evaluated by its owner (git refuses a repo
+  # nh runs as you, so the flake is evaluated by its owner (git refuses a repo
   # owned by someone else) and a --build-host is reached over your ssh, not
-  # root's. --elevate=sudo has nixos-rebuild sudo only for activation, reusing
-  # the ticket kept fresh by keep_sudo_alive. The build host only has to have
-  # you in its nix.settings.trusted-users.
-  def rebuild_command
-    cmd_options = ["--log-format", "bar-with-logs", "--flake", "#{config_dir}##{host}", "--elevate=sudo"]
+  # root's. It sudos only for activation, reusing the ticket kept fresh by
+  # keep_sudo_alive. The build host only has to have you in its
+  # nix.settings.trusted-users. With -u it updates flake.lock first, so an
+  # update is only ever written alongside a build of it.
+  def rebuild_command(update: false)
+    cmd_options = [config_dir, "--hostname", host]
+    cmd_options << "--update" if update
     cmd_options << "--impure" if impure?
     cmd_options << "--build-host" << build_host if build_host
     cmd_options << "--max-jobs" << max_jobs.to_s if max_jobs
     cmd_options << "--cores" << cores.to_s if cores
-    command("nixos-rebuild", *cmd_options, rebuild_type)
+    command(*nh, "os", rebuild_type, *cmd_options)
+  end
+
+  # Before the first rebuild installs it (programs.nh), nh is run from the
+  # system's nixpkgs, with flakes enabled for the nix it runs too.
+  def nh
+    @nh ||=
+      if system("command -v nh", out: File::NULL)
+        ["nh"]
+      else
+        ENV["NIX_CONFIG"] = [ENV["NIX_CONFIG"], "extra-experimental-features = nix-command flakes"].compact.join("\n")
+        %w[nix run nixpkgs#nh --]
+      end
   end
 
   # Without a rebuild, show the commands that would have followed instead.
   def print_manual_steps
     prompt = ->(cmd) { "#{cmd.sudo ? '#' : '$'} #{cmd.argv.join(' ')}" }
     package_update_commands.each { |cmd| puts "Update package: #{prompt.(cmd)}" }
-    puts "Update flake: #{prompt.(flake_update_command)}"
     puts "Rebuild NixOS: #{prompt.(rebuild_command)}"
+    puts "Update flake and rebuild: #{prompt.(rebuild_command(update: true))}"
     puts "Collect garbage: $ #{garbage_command.argv.join(' ')}" unless gc.nil?
   end
 
