@@ -85,5 +85,19 @@
   time.timeZone = "America/Chicago";
 
   # The release this machine was first installed with. Never change it.
+  # Keep this machine up to date by itself: rebuild nightly from what's been
+  # pushed to GitHub, instead of running bin/install_nix here. Its hardware
+  # config is checked in, so the flake builds without a local checkout.
+  # flake.lock isn't updated here; it builds whatever lock was last pushed
+  # (bump it with `bin/install_nix --update` elsewhere, then push).
+  # system.autoUpgrade = {
+  #   enable = true;
+  #   flake = "github:carlzulauf/dotbox?dir=nix#khoa";
+  #   operation = "boot"; # or "switch" to activate right away
+  #   dates = "04:00";
+  #   randomizedDelaySec = "45min";
+  #   allowReboot = false; # true (with rebootWindow) to boot into it unattended
+  # };
+
   system.stateVersion = "24.05";
 }
