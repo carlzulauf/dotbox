@@ -1,4 +1,4 @@
-{ config, pkgs, lib, llm-agents, ... }:
+{ config, pkgs, lib, llm-agents, overbee, ... }:
 let
   llmAgents = llm-agents.packages.${pkgs.stdenv.hostPlatform.system};
 
@@ -132,6 +132,8 @@ in
       llmAgents.claude-code
       llmAgents.pi
       llmAgents.agent-browser
+      # rbbot's chats in a terminal, from overbee
+      overbee.packages.${pkgs.stdenv.hostPlatform.system}.rbbot
     ]
     # terminfo for ghostty/kitty/foot/etc so remote tmux sessions work
     ++ terminfoPackages;

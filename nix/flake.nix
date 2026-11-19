@@ -36,6 +36,12 @@
     # AI coding agents (claude-code, pi, claude-desktop, ...), updated daily.
     #  No nixpkgs follows, so builds come from cache.numtide.com (see configuration.nix)
     llm-agents.url = "github:numtide/llm-agents.nix";
+
+    # rbbot's CLI (overbee's rbbot-cli/), on every machine as rbbot, built
+    #  from its own lock (see overbee's doc/rbbot-cli.md)
+    overbee.url = "git+ssh://git@mrks.io/overbee";
+    overbee.inputs.nixpkgs.follows = "nixpkgs";
+    overbee.inputs.flake-utils.follows = "ds4/flake-utils";
   };
 
   outputs = {
