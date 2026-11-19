@@ -267,9 +267,14 @@ class Script
 
   # Before the first rebuild installs it (programs.nh), nh is run from the
   # system's nixpkgs, with flakes enabled for the nix it runs too.
+  #
+  # PATH is searched here rather than with `command -v nh`: Ruby runs a
+  # command string without shell metacharacters by exec'ing its first word
+  # directly, and `command` is a shell builtin with no executable, so that
+  # check always failed and nh always ran through nix run.
   def nh
     @nh ||=
-      if system("command -v nh", out: File::NULL)
+      if ENV.fetch("PATH", "").split(File::PATH_SEPARATOR).any? { |dir| File.executable?(File.join(dir, "nh")) }
         ["nh"]
       else
         ENV["NIX_CONFIG"] = [ENV["NIX_CONFIG"], "extra-experimental-features = nix-command flakes"].compact.join("\n")
