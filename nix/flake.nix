@@ -39,7 +39,7 @@
 
     # rbbot's CLI (overbee's rbbot-cli/), on every machine as rbbot, built
     #  from its own lock (see overbee's doc/rbbot-cli.md)
-    overbee.url = "git+ssh://git@mrks.io/overbee";
+    overbee.url = "git+ssh://git@mrks.io/~/overbee";
     overbee.inputs.nixpkgs.follows = "nixpkgs";
     overbee.inputs.flake-utils.follows = "ds4/flake-utils";
   };

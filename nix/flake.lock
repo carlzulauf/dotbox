@@ -201,6 +201,30 @@
         "type": "github"
       }
     },
+    "overbee": {
+      "inputs": {
+        "flake-utils": [
+          "ds4",
+          "flake-utils"
+        ],
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1795065595,
+        "narHash": "sha256-RuewWVnYhEYCAhSHkWbpOLlcUVaxlG0kRl0IGRbZ+8M=",
+        "ref": "refs/heads/main",
+        "rev": "5d7ee2321209948ad8bb9d8111a4dbb7708f0035",
+        "revCount": 108,
+        "type": "git",
+        "url": "ssh://git@mrks.io/~/overbee"
+      },
+      "original": {
+        "type": "git",
+        "url": "ssh://git@mrks.io/~/overbee"
+      }
+    },
     "puma-dev": {
       "inputs": {
         "flake-utils": [
@@ -233,6 +257,7 @@
         "nixpkgs": "nixpkgs_2",
         "nixpkgs-master": "nixpkgs-master",
         "nixpkgs-xps-kernel": "nixpkgs-xps-kernel",
+        "overbee": "overbee",
         "puma-dev": "puma-dev",
         "voxtype": "voxtype"
       }
