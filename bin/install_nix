@@ -329,8 +329,13 @@ class Script
   def configuration_limit
     @configuration_limit ||= begin
       attr = "#{config_dir}#nixosConfigurations.#{host}.config.boot.loader.systemd-boot.configurationLimit"
-      limit = IO.popen(["nix", "eval", "--json", *(impure? ? ["--impure"] : []), attr], err: File::NULL, &:read).strip
-      abort "Couldn't read configurationLimit for #{host} (got #{limit.inspect}); pass --gc=SPEC." unless limit.match?(/\A[1-9]\d*\z/)
+      require 'open3'
+      out, err, status = Open3.capture3("nix", "eval", "--json", *(impure? ? ["--impure"] : []), attr)
+      limit = out.strip
+      unless status.success? && limit.match?(/\A[1-9]\d*\z/)
+        warn err unless status.success? || err.empty?
+        abort "Couldn't read configurationLimit for #{host} (got #{limit.inspect}); pass --gc=SPEC."
+      end
 
       limit
     end
