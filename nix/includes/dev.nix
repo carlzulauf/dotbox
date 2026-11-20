@@ -8,7 +8,7 @@
     zoom-us
     libreoffice
     insomnia
-    jira-cli-go
+    acli
 
     # trying out some SQL GUIs
     sequeler beekeeper-studio dbeaver-bin
