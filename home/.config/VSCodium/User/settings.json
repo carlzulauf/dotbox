@@ -20,7 +20,10 @@
   // Used only by workspaces that set rubyLsp.rubyVersionManager to "custom".
   // This setting is machine-scoped (global), so the per-project logic lives in
   // the fish function instead: ~/.config/fish/functions/ruby_lsp_activate.fish
-  "rubyLsp.customRubyCommand": "ruby_lsp_activate",
+  // ruby-lsp runs this in the default terminal shell, or in /bin/sh when it
+  // starts before the editor knows that, so ruby_lsp_env (~/.local/bin) runs
+  // the function and prints its environment in the calling shell's syntax.
+  "rubyLsp.customRubyCommand": "eval \"$(~/.local/bin/ruby_lsp_env)\"",
   "rewrap.wrappingColumn": 80,
   // Code Spell Checker (streetsidesoftware.code-spell-checker), pinned in
   // nix/includes/gui.nix. Default is to check every file type, which is noisy

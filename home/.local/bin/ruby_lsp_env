@@ -1,0 +1,43 @@
+#!/usr/bin/env fish
+# Prints the environment ruby_lsp_activate (~/.config/fish/functions) gives the
+# project in the current directory, as commands for the shell that called this
+# to eval: fish's when that's fish, POSIX sh's otherwise.
+#
+# It's the ruby-lsp extension's rubyLsp.customRubyCommand, as
+#   eval "$(~/.local/bin/ruby_lsp_env)" && ruby ...
+# which the extension runs in vscode.env.shell. That's usually fish, but it's
+# empty when ruby-lsp starts before the editor has looked up the default
+# terminal shell, and the command then runs in /bin/sh, where the fish
+# function isn't there. Running the function in this fish script works the
+# same from either shell.
+#
+# Every exported variable is printed, not only the ones the function changed:
+# a shell other than fish hasn't had fish's config (conf.d sets PATH and
+# GEM_HOME, for one), and the function runs after it.
+
+# The function's output would be eval'd, so it goes to stderr with direnv's
+ruby_lsp_activate >&2
+
+# This script's own variables are prefixed, as `$$__ruby_lsp_env_name` would
+# read a local rather than an exported variable of the same name, and nix
+# devshells export ones like name, out and shell
+set -l __ruby_lsp_env_parent (ps -o ppid= -p $fish_pid | string trim)
+set -l __ruby_lsp_env_caller (ps -o comm= -p $__ruby_lsp_env_parent | string trim)
+
+# Values are kept in variables and quoted ("$$name" is the exported string,
+# a path variable's elements joined with colons), as a command substitution
+# would trim their trailing newlines
+for __ruby_lsp_env_name in (set --names --export)
+    # Names neither shell can set, and ones that belong to the caller
+    string match --quiet --regex '^[A-Za-z_][A-Za-z0-9_]*$' -- $__ruby_lsp_env_name; or continue
+    contains -- $__ruby_lsp_env_name PWD OLDPWD SHLVL _; and continue
+
+    if string match --quiet '*fish*' -- $__ruby_lsp_env_caller
+        echo "set -gx $__ruby_lsp_env_name "(string escape --style=script -- "$$__ruby_lsp_env_name")
+    else
+        # string replace adds a newline, which the precision leaves off
+        set -l __ruby_lsp_env_quoted (string replace --all "'" "'\\''" -- "$$__ruby_lsp_env_name" | string collect --no-trim-newlines)
+        set -l __ruby_lsp_env_length (math (string length -- "$__ruby_lsp_env_quoted") - 1)
+        printf "export %s='%.$__ruby_lsp_env_length""s'\n" $__ruby_lsp_env_name "$__ruby_lsp_env_quoted"
+    end
+end
