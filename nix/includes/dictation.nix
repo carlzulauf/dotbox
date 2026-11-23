@@ -73,7 +73,11 @@ let
   # pinned config path. onnxruntime is the one the build linked against
   # (voxtype's nixpkgs follows ours). The user services' PATH has little more
   # than coreutils, so it also gets curl (model downloads) and which (output
-  # drivers are only used when `which <driver>` finds them).
+  # drivers are only used when `which <driver>` finds them). Meeting mode
+  # shells out to pipewire (pw-dump, pw-link, pw-play, and the echo
+  # canceller), pactl and parec (loopback capture), and ffmpeg (retained
+  # audio, playback); like upstream's wrapper, those go last so a system copy
+  # matching the running sound server wins.
   package = pkgs.symlinkJoin {
     name = "voxtype-${unwrapped.version}";
     paths = [ unwrapped ];
@@ -83,6 +87,9 @@ let
         --add-flags "--config ${configPath}" \
         --prefix PATH : ${lib.makeBinPath (with pkgs; [
           dotool wtype wl-clipboard libnotify pciutils curl which
+        ])} \
+        --suffix PATH : ${lib.makeBinPath (with pkgs; [
+          pipewire pulseaudio ffmpeg-headless xdg-utils
         ])} \
         --set ORT_DYLIB_PATH "${pkgs.onnxruntime}/lib/libonnxruntime.so" \
         --prefix LD_LIBRARY_PATH : "${pkgs.onnxruntime}/lib"
@@ -116,6 +123,16 @@ let
       mode = "type";
       driver_order = [ "dotool" "clipboard" ];
       fallback_to_clipboard = true;
+    };
+    # Meeting transcription (`voxtype meeting start|stop|list|export`),
+    # stored in ~/.local/share/voxtype/meetings. Turning it on from the tray
+    # would rewrite this read-only config, so it's on here.
+    meeting = {
+      enabled = true;
+      # Offer to record when a call app takes the mic (off by default outside
+      # Omarchy). Native clients like Zoom are seen through PipeWire alone;
+      # browser calls need Hyprland's window list, so GNOME misses those.
+      detect.enabled = true;
     };
   } (lib.mapAttrs (_engine: model: { inherit model; }) cfg.models);
 
