@@ -32,20 +32,10 @@ let
   configPath = "/etc/voxtype/config.toml";
 
   # CPU build with every ONNX engine (Cohere, Parakeet, ...) plus Whisper.
-  # Applies patch from upstream PR [502](https://github.com/peteonrails/voxtype/pull/502)
-  # which fixes issues with daemon holding on to output devices, preventing
-  # device/default switching.
   onnxUnwrapped = voxtype.packages.${system}.voxtype-onnx-unwrapped.overrideAttrs (old: {
     # nixpkgs' cargo-setup-hook now has onig_sys and libsqlite3-sys use system
     #  libraries, which voxtype's flake doesn't declare
     buildInputs = (old.buildInputs or [ ]) ++ [ pkgs.oniguruma pkgs.sqlite ];
-    patches = (old.patches or [ ]) ++ [
-      (pkgs.fetchpatch {
-        name = "voxtype-pr502-feedback-stream.patch";
-        url = "https://github.com/peteonrails/voxtype/commit/242da0ebbb0b52ce41e90c3fd7647a55bbb6c83d.patch";
-        hash = "sha256-aS2gnTsGZc31Ar6BFTNKjOUkuGEJ9YjZFXNnoJGqpu4=";
-      })
-    ];
   });
 
   # Upstream ships Whisper-on-Vulkan and the ONNX engines as separate builds;
