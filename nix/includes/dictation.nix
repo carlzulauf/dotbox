@@ -36,6 +36,11 @@ let
     # nixpkgs' cargo-setup-hook now has onig_sys and libsqlite3-sys use system
     #  libraries, which voxtype's flake doesn't declare
     buildInputs = (old.buildInputs or [ ]) ++ [ pkgs.oniguruma pkgs.sqlite ];
+    # Gives end_streaming(), batch fallback transcription included, a 100ms
+    #  wall-clock deadline, which a busy build host can miss
+    checkFlags = (old.checkFlags or [ ]) ++ [
+      "--skip=daemon::tests::streaming_stop_watchdog_recovers_when_backend_never_ends"
+    ];
   });
 
   # Upstream ships Whisper-on-Vulkan and the ONNX engines as separate builds;

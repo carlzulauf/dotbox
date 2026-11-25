@@ -1,4 +1,4 @@
-{ config, pkgs, lib, nixos-hardware, nixpkgs-master, nixpkgs-xps-kernel, ... }:
+{ config, pkgs, lib, nixos-hardware, nixpkgs-master, ... }:
 {
   # Dell XPS 13 9350 (2024) w/288v Lunar Lake CPU
   networking.hostName = "xps";
@@ -19,16 +19,18 @@
   # Add sensor node in bound callback"; without it the IR sensor (HIMX1092, no
   # driver) keeps the IPU7 notifier from completing and the sensor never gets a
   # /dev/v4l-subdev node, so libcamera can't use it.  Ride the 7.4 RCs until
-  # linuxPackages_latest catches up, then this falls back on its own.
+  # linuxPackages_latest catches up, then this falls back on its own.  RCs
+  # come from master, which gets them days before nixos-unstable.
   #
-  # Held at 7.4-rc1: on rc2, sof_sdw's probe oopses on a NULL name_prefix in
-  # asoc_sdw_rt_amp_spk_rtd_init() (the rt1318 amps).  The dead udev worker
-  # keeps the device lock, so there's no sound card and the next suspend hangs
-  # forever in dpm_prepare with Wi-Fi already down.  Before moving to a newer
-  # RC, boot it and check `journalctl -k -b | grep rt_amp_spk_rtd_init` is empty.
+  # Skip 7.4-rc2: sof_sdw's probe oopses on a NULL name_prefix in
+  # asoc_sdw_rt_amp_spk_rtd_init() (the rt1318 amps), leaving no sound card
+  # and a suspend that hangs forever in dpm_prepare.  Fixed in rc3 by
+  # d00ba321499c ("ASoC: soc-core: reset rtd->num_components after
+  # allocation").  After booting a new RC, check
+  # `journalctl -k -b | grep rt_amp_spk_rtd_init` is empty.
   boot.kernelPackages =
     if lib.versionOlder pkgs.linuxPackages_latest.kernel.version "7.4"
-    then nixpkgs-xps-kernel.linuxPackages_testing
+    then nixpkgs-master.linuxPackages_testing
     else pkgs.linuxPackages_latest;
   # Allow rootless containers to bind ports 80+ (needed for dokku, nginx, etc.)
   boot.kernel.sysctl."net.ipv4.ip_unprivileged_port_start" = 80;
