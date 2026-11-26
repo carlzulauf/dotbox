@@ -1,9 +1,11 @@
-{ config, pkgs, llm-agents, nixpkgs-master, ... }:
+{ config, pkgs, llm-agents, nixpkgs-master, overbee, ... }:
 
 {
   environment.systemPackages = [
     llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.claude-desktop
     (pkgs.callPackage ../pkgs/t3code-desktop { })
+    # overbee's desktop app: GTK 4 window of WebKit tabs onto an overbee
+    overbee.packages.${pkgs.stdenv.hostPlatform.system}.desktop
 
     # herdr-desktop finds its own herdr-core in the store. Don't add herdr-core
     #  here: found in sw/bin, the app puts sw/bin ahead of /run/wrappers/bin in

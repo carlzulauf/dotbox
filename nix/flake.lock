@@ -196,11 +196,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1795568526,
-        "narHash": "sha256-A7OyZMgHlj7ve07OV8jwXA5ot0UeGKErKD5VRLQAe7A=",
+        "lastModified": 1795666711,
+        "narHash": "sha256-eiDZDcoEBWbHo0vJ+rZO4ValbarsBlX6NAzTB2Zd9D0=",
         "ref": "refs/heads/main",
-        "rev": "65991805adad220b176738b6d56b57da4d4331cb",
-        "revCount": 126,
+        "rev": "0b8024753e12d545a1831038d14d7aeeb3ae2aab",
+        "revCount": 151,
         "type": "git",
         "url": "ssh://git@mrks.io/~/overbee"
       },
