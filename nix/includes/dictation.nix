@@ -223,10 +223,16 @@ in
     hardware.uinput.enable = true;
     users.users.${user}.extraGroups = [ "uinput" ];
 
+    # User services are installed for every user, GDM's login screen included:
+    # its greeter session (gdm-greeter, home on tmpfs under /run/gdm) reaches
+    # graphical-session.target too, so without this it would download the
+    # models into RAM on every boot and pop up "model failed" notifications.
+    #
     # Models live in ~/.local/share/voxtype/models. Already-downloaded ones are
     # checked and skipped, so this is quick after the first login.
     systemd.user.services.voxtype-models = {
       description = "Download Voxtype speech models";
+      unitConfig.ConditionUser = user;
       serviceConfig = {
         Type = "oneshot";
         RemainAfterExit = true;
@@ -244,6 +250,7 @@ in
 
     systemd.user.services.voxtype = {
       description = "Voxtype dictation daemon";
+      unitConfig.ConditionUser = user;
       wantedBy = [ "graphical-session.target" ];
       partOf = [ "graphical-session.target" ];
       wants = [ "voxtype-models.service" ];
@@ -257,6 +264,7 @@ in
 
     systemd.user.services.voxtype-shortcuts = {
       description = "Add Voxtype dictation shortcuts to GNOME";
+      unitConfig.ConditionUser = user;
       wantedBy = [ "graphical-session.target" ];
       serviceConfig = {
         Type = "oneshot";
